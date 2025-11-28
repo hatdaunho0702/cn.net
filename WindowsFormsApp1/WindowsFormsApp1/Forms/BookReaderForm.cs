@@ -951,7 +951,7 @@ namespace WindowsFormsApp1.Forms
         {
             if (color.R > 200 && color.G > 200 && color.B < 100) return "🟡"; // Yellow
             if (color.G > 200 && color.R < 200) return "🟢"; // Green
-            if (color.R > 200 && color.B > 150) return "🔴"; // Pink/Red
+            if (color.R > 200 && color.G < 150) return "🔴"; // Pink/Red
             if (color.B > 180 && color.R > 180) return "🟣"; // Purple
             return "⚪"; // Default
         }
