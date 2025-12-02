@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using WindowsFormsApp1.Data;
+using WindowsFormsApp1.Models;
 
 namespace WindowsFormsApp1.Forms
 {

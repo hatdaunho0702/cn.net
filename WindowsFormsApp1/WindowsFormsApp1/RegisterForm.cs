@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.Windows.Forms;
 using WindowsFormsApp1.Data;
+using WindowsFormsApp1.Models; // Thêm using
 
 namespace WindowsFormsApp1.Forms
 {

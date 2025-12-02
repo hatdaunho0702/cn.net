@@ -112,20 +112,17 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Book.cs" />
+    <Compile Include="Constants\AppConstants.cs" />
+    <Compile Include="Constants\ThemeColors.cs" />
     <Compile Include="Controls\BookCard.cs">
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="CustomMenuRenderer.cs" />
-    <Compile Include="Data\BookReaderService.cs" />
-    <Compile Include="Data\BookScannerService.cs" />
     <Compile Include="Data\DatabaseConnection.cs" />
     <Compile Include="Data\DataManager.cs" />
-    <Compile Include="Data\Highlight.cs" />
-    <Compile Include="Data\ReadingGoal.cs" />
-    <Compile Include="Data\ReportService.cs" />
-    <Compile Include="Data\Shelf.cs" />
-    <Compile Include="Data\User.cs" />
+    <Compile Include="Data\Repositories\IBookRepository.cs" />
+    <Compile Include="Data\Repositories\IHighlightRepository.cs" />
+    <Compile Include="Data\Repositories\IUserRepository.cs" />
     <Compile Include="EditProfileForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -147,7 +144,6 @@
     <Compile Include="Forms\ManageShelfDialog.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Data\GeminiService.cs" />
     <Compile Include="Forms\ReadingGoalsForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -160,6 +156,12 @@
     <Compile Include="MainForm.Designer.cs">
       <DependentUpon>MainForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="Models\Book.cs" />
+    <Compile Include="Models\BookChapter.cs" />
+    <Compile Include="Models\Highlight.cs" />
+    <Compile Include="Models\ReadingGoal.cs" />
+    <Compile Include="Models\Shelf.cs" />
+    <Compile Include="Models\User.cs" />
     <Compile Include="NoteDialog.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -184,7 +186,14 @@
     <Compile Include="RegisterForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Services\BookReaderService.cs" />
+    <Compile Include="Services\BookScannerService.cs" />
+    <Compile Include="Services\GeminiService.cs" />
     <Compile Include="Services\ReadingReminderService.cs" />
+    <Compile Include="Services\ReportService.cs" />
+    <Compile Include="Utils\FileHelper.cs" />
+    <Compile Include="Utils\SecurityHelper.cs" />
+    <Compile Include="Utils\UIHelper.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">
@@ -198,14 +207,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="HUONG_DAN_MUC_TIEU_DOC_SACH.md" />
-    <None Include="HUONG_DAN_UI_GOALS.md" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
-    <None Include="TOM_TAT_CHUC_NANG.md" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Database\AddBookReaderTables.sql" />

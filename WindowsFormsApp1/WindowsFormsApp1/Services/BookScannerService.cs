@@ -1,13 +1,15 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Windows.Forms;
 using VersOne.Epub;
-using UglyToad.PdfPig; // NuGet: PdfPig
-using UglyToad.PdfPig.Content; // Để xử lý nội dung PDF
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
+using WindowsFormsApp1.Data;
+using WindowsFormsApp1.Models;
 
-namespace WindowsFormsApp1.Data
+namespace WindowsFormsApp1.Services
 {
     public class BookScannerService
     {
@@ -59,13 +61,11 @@ namespace WindowsFormsApp1.Data
             catch { return null; }
         }
 
-        // Helper: Convert PdfPig Image to Byte Array
         private byte[] ConvertPdfImageToBytes(IPdfImage pdfImage)
         {
             try
             {
                 if (pdfImage.TryGetPng(out byte[] pngBytes)) return pngBytes;
-                // Nếu không lấy được PNG, thử lấy Raw Bytes (thường là JPG hoặc JP2)
                 return pdfImage.RawBytes.ToArray();
             }
             catch { return null; }
@@ -99,7 +99,6 @@ namespace WindowsFormsApp1.Data
 
                 if (!readMetadata) return book;
 
-                // --- Xử lý EPUB ---
                 if (ext == ".epub")
                 {
                     try
@@ -113,47 +112,39 @@ namespace WindowsFormsApp1.Data
                         if (epub.CoverImage != null && epub.CoverImage.Length > 0)
                             book.CoverImagePath = SaveCoverImage(epub.CoverImage, Path.GetFileNameWithoutExtension(filePath));
                     }
-                    catch (Exception ex) { Console.WriteLine($"Lỗi Metadata EPUB: {ex.Message}"); }
+                    catch (Exception ex) { Console.WriteLine($"L?i Metadata EPUB: {ex.Message}"); }
                 }
-                // --- [MỚI] Xử lý PDF (Dùng PdfPig) ---
                 else if (ext == ".pdf")
                 {
                     try
                     {
                         using (var pdf = PdfDocument.Open(filePath))
                         {
-                            // 1. Đọc Metadata cơ bản
                             if (pdf.Information.Title != null) book.Title = pdf.Information.Title;
                             if (pdf.Information.Author != null) book.Author = pdf.Information.Author;
 
-                            // 2. Lấy tổng số trang chính xác của PDF
                             book.TotalPages = pdf.NumberOfPages;
 
-                            // 3. Trích xuất ảnh bìa (Thử lấy ảnh đầu tiên ở trang 1)
-                            // Lưu ý: PdfPig trích xuất ảnh nhúng, không phải render trang thành ảnh.
-                            // Nếu trang 1 là text thuần, sẽ không có ảnh bìa.
                             try
                             {
                                 var page1 = pdf.GetPage(1);
                                 var images = page1.GetImages();
                                 foreach (var img in images)
                                 {
-                                    // Lấy ảnh đầu tiên tìm thấy
                                     byte[] imgBytes = ConvertPdfImageToBytes(img);
                                     if (imgBytes != null && imgBytes.Length > 0)
                                     {
                                         book.CoverImagePath = SaveCoverImage(imgBytes, Path.GetFileNameWithoutExtension(filePath));
-                                        break; // Chỉ lấy 1 ảnh làm bìa
+                                        break;
                                     }
                                 }
                             }
-                            catch { /* Bỏ qua lỗi ảnh bìa PDF */ }
+                            catch { }
                         }
                     }
-                    catch (Exception ex) { Console.WriteLine($"Lỗi Metadata PDF: {ex.Message}"); }
+                    catch (Exception ex) { Console.WriteLine($"L?i Metadata PDF: {ex.Message}"); }
                 }
 
-                // Tính số trang ước tính cho các loại file khác (EPUB, TXT)
                 if (ext != ".pdf")
                 {
                     try
@@ -168,7 +159,7 @@ namespace WindowsFormsApp1.Data
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi file {Path.GetFileName(filePath)}: {ex.Message}");
+                MessageBox.Show($"L?i file {Path.GetFileName(filePath)}: {ex.Message}");
                 return null;
             }
         }
@@ -214,10 +205,10 @@ namespace WindowsFormsApp1.Data
                 }
                 catch (Exception ex)
                 {
-                    onProgress?.Invoke($"Lỗi: {ex.Message}");
+                    onProgress?.Invoke($"L?i: {ex.Message}");
                 }
             }
-            onProgress?.Invoke($"HOÀN TẤT! Thêm: {imported}, Bỏ qua: {skipped}.");
+            onProgress?.Invoke($"HO�N T?T! Th�m: {imported}, B? qua: {skipped}.");
         }
     }
 }

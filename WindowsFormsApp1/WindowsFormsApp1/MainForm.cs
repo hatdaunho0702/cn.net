@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using WindowsFormsApp1.Controls;
 using WindowsFormsApp1.Data;
 using WindowsFormsApp1.Forms;
+using WindowsFormsApp1.Models;
+using WindowsFormsApp1.Services;
 
 namespace WindowsFormsApp1
 {
@@ -49,7 +51,7 @@ namespace WindowsFormsApp1
         // TopBar Controls
         private ModernButton btnAddBook; // Nút mới gộp chức năng
         private ModernButton sortButton;
-        private ModernButton btnReport;
+        private ModernButton btnReport; // Nút báo cáo sách
         private Button userButton;
         private Label lblUsername;
         private Label logoLabel;
@@ -57,6 +59,7 @@ namespace WindowsFormsApp1
         // Menus
         private ContextMenuStrip authMenu;
         private ContextMenuStrip importMenu;
+        private ContextMenuStrip sortMenu;   // Menu sắp xếp
 
         // Footer / Status
         private StatusStrip statusStrip;
@@ -138,18 +141,54 @@ namespace WindowsFormsApp1
             // 4. Action Buttons
             int btnY = 15;
 
-            // Nút Báo cáo
+            // [ĐƠN GIẢN HÓA] Nút Báo cáo - click trực tiếp
             btnReport = CreateModernButton("🖨 Báo cáo", 110, Color.Teal);
             btnReport.Location = new Point(550, btnY);
-            btnReport.Click += BtnReport_Click;
+            btnReport.Visible = false; // Ẩn khi chưa đăng nhập
+            btnReport.Click += (s, e) => BtnReportBooks_Click(); // Click trực tiếp vào báo cáo sách
 
-            // Nút Sắp xếp
+            // [CẬP NHẬT] Nút Sắp xếp với dropdown menu
             sortButton = CreateModernButton("⇅ Sắp xếp", 110, Color.Transparent);
             sortButton.ForeColor = clrTextActive;
             sortButton.BorderColor = Color.FromArgb(80, 80, 80);
             sortButton.BorderSize = 1;
             sortButton.Location = new Point(670, btnY);
-            sortButton.Click += SortButton_Click;
+            sortButton.Visible = false; // Ẩn khi chưa đăng nhập
+            
+            // Tạo menu dropdown cho sắp xếp
+            sortMenu = new ContextMenuStrip();
+            sortMenu.Renderer = new DarkMenuRenderer();
+            sortMenu.BackColor = clrTopBar;
+            sortMenu.ForeColor = Color.White;
+
+            var sortOptions = new[] {
+                ("📅  Ngày thêm", "Date"),
+                ("📖  Tên sách", "Book name"),
+                ("✍  Tác giả", "Author name"),
+                ("📊  Tiến độ đọc", "Reading progress")
+            };
+
+            foreach (var option in sortOptions)
+            {
+                var item = new ToolStripMenuItem(option.Item1);
+                item.Tag = option.Item2;
+                item.Click += SortMenuItem_Click;
+                sortMenu.Items.Add(item);
+            }
+
+            sortMenu.Items.Add(new ToolStripSeparator());
+
+            var itemAscending = new ToolStripMenuItem("⬆  Tăng dần");
+            itemAscending.Tag = "ASC";
+            itemAscending.Click += SortDirectionMenuItem_Click;
+            sortMenu.Items.Add(itemAscending);
+
+            var itemDescending = new ToolStripMenuItem("⬇  Giảm dần");
+            itemDescending.Tag = "DESC";
+            itemDescending.Click += SortDirectionMenuItem_Click;
+            sortMenu.Items.Add(itemDescending);
+
+            sortButton.Click += (s, e) => sortMenu.Show(sortButton, new Point(0, sortButton.Height));
 
             // --- NÚT GỘP: THÊM SÁCH ---
             btnAddBook = CreateModernButton("➕ Thêm sách", 120, Color.FromArgb(0, 90, 160));
@@ -428,7 +467,11 @@ namespace WindowsFormsApp1
 
             bool isFilterView = view == "Highlights" || view == "Notes";
             pnlFilterBar.Visible = isFilterView;
-            sortButton.Visible = !isFilterView;
+            
+            // [CẬP NHẬT] Chỉ hiện nút Sắp xếp và Báo cáo khi ở view Books hoặc các view liên quan đến sách
+            bool isBookView = (view == "Books" || view == "Favorites" || view == "Trash" || view == "Shelf");
+            sortButton.Visible = isBookView && _currentUser != null;
+            btnReport.Visible = (view == "Books") && _currentUser != null; // Chỉ hiện ở Books
 
             if (isFilterView) LoadFilterCombobox();
 
@@ -793,7 +836,10 @@ namespace WindowsFormsApp1
 
             if (_currentUser == null)
             {
+                // [CẬP NHẬT] Ẩn các nút khi chưa đăng nhập
                 btnAddBook.Visible = false;
+                btnReport.Visible = false;
+                sortButton.Visible = false;
                 lblUsername.Visible = false;
                 userButton.BackColor = Color.FromArgb(80, 80, 80);
                 userButton.Text = "👤";
@@ -807,11 +853,84 @@ namespace WindowsFormsApp1
                 lblUsername.Visible = true;
                 lblUsername.Location = new Point(userButton.Left - lblUsername.Width - gap, 25);
 
+                // [CẬP NHẬT] Hiện các nút khi đã đăng nhập
                 btnAddBook.Visible = true;
+                // btnReport và sortButton sẽ được điều khiển bởi SwitchView()
+                // Chỉ hiện sortButton nếu đang ở view sách
+                bool isBookView = (currentView == "Books" || currentView == "Favorites" || currentView == "Trash" || currentView == "Shelf");
+                sortButton.Visible = isBookView;
+                btnReport.Visible = (currentView == "Books"); // Chỉ hiện ở Books
+                
                 btnAddBook.Location = new Point(lblUsername.Left - btnAddBook.Width - gap, 15);
+                sortButton.Location = new Point(btnAddBook.Left - sortButton.Width - gap, 15);
+                btnReport.Location = new Point(sortButton.Left - btnReport.Width - gap, 15);
             }
             RefreshSidebarShelves();
         }
+
+        // [MỚI] Xử lý sự kiện click vào menu sắp xếp
+        private void SortMenuItem_Click(object sender, EventArgs e)
+        {
+            if (sender is ToolStripMenuItem item && item.Tag != null)
+            {
+                currentSortBy = item.Tag.ToString();
+                LoadBooks();
+            }
+        }
+
+        private void SortDirectionMenuItem_Click(object sender, EventArgs e)
+        {
+            if (sender is ToolStripMenuItem item && item.Tag != null)
+            {
+                sortAscending = item.Tag.ToString() == "ASC";
+                LoadBooks();
+            }
+        }
+
+        // [MỚI] Báo cáo sách
+        private void BtnReportBooks_Click()
+        {
+            if (_currentUser == null) 
+            { 
+                MessageBox.Show("Vui lòng đăng nhập!", "Yêu cầu", MessageBoxButtons.OK, MessageBoxIcon.Warning); 
+                return; 
+            }
+            
+            var books = DataManager.Instance.GetAllBooks();
+            if (books.Count == 0) 
+            { 
+                MessageBox.Show("Không có dữ liệu để báo cáo.", "Thông báo"); 
+                return; 
+            }
+            
+            var reportService = new WindowsFormsApp1.Services.ReportService();
+            reportService.CreateBookListReport(books, _currentUser.DisplayName);
+        }
+
+        private void ShowLoginForm() { var form = new LoginForm(); if (form.ShowDialog() == DialogResult.OK) { _currentUser = form.LoggedInUser; UpdateUIAuth(); LoadBooks(); } }
+        private void ShowRegisterForm() { var form = new RegisterForm(); if (form.ShowDialog() == DialogResult.OK) { _currentUser = form.RegisteredUser; UpdateUIAuth(); LoadBooks(); } }
+        private void OpenBook(Book book) { if (!File.Exists(book.FilePath)) { MessageBox.Show("File không tồn tại"); return; } var form = new BookReaderForm(book); form.ShowDialog(); LoadBooks(); }
+
+        private void ShowBookMenu(Book book, BookCard card)
+        {
+            ContextMenuStrip menu = new ContextMenuStrip { BackColor = clrTopBar, ForeColor = Color.White, Renderer = new DarkMenuRenderer() };
+            if (!book.IsDeleted)
+            {
+                var editItem = new ToolStripMenuItem("✎  Sửa thông tin"); editItem.Click += (s, e) => { using (var editForm = new EditBookForm(book)) { if (editForm.ShowDialog() == DialogResult.OK) LoadBooks(); } }; menu.Items.Add(editItem);
+                menu.Items.Add(new ToolStripSeparator());
+                var openItem = new ToolStripMenuItem("📁  Mở thư mục"); openItem.Click += (s, e) => System.Diagnostics.Process.Start("explorer.exe", $"/select, \"{book.FilePath}\""); menu.Items.Add(openItem);
+                var delItem = new ToolStripMenuItem("🗑️  Xóa"); delItem.Click += (s, e) => { DataManager.Instance.DeleteBook(book.Id); LoadBooks(); }; menu.Items.Add(delItem);
+            }
+            else
+            {
+                var restore = new ToolStripMenuItem("♻️  Khôi phục"); restore.Click += (s, e) => { DataManager.Instance.RestoreBook(book.Id); LoadBooks(); }; menu.Items.Add(restore);
+            }
+            menu.Show(card, new Point(0, card.Height));
+        }
+
+        private void BtnAddShelf_Click(object sender, EventArgs e) { if (_currentUser == null) return; using (var dlg = new AddShelfDialog()) if (dlg.ShowDialog() == DialogResult.OK) { DataManager.Instance.AddShelf(dlg.ShelfName, dlg.ShelfDescription); RefreshSidebarShelves(); } }
+        private void BtnManageShelf_Click(object sender, EventArgs e) { if (_currentUser == null) return; using (var dlg = new ManageShelfDialog()) { dlg.ShowDialog(); RefreshSidebarShelves(); } }
+        private void SortButton_Click(object sender, EventArgs e) { /* Sort logic */ }
 
         private void UserButton_Click(object sender, EventArgs e)
         {
@@ -897,31 +1016,23 @@ namespace WindowsFormsApp1
             return path;
         }
 
-        private void ShowLoginForm() { var form = new LoginForm(); if (form.ShowDialog() == DialogResult.OK) { _currentUser = form.LoggedInUser; UpdateUIAuth(); LoadBooks(); } }
-        private void ShowRegisterForm() { var form = new RegisterForm(); if (form.ShowDialog() == DialogResult.OK) { _currentUser = form.RegisteredUser; UpdateUIAuth(); LoadBooks(); } }
-        private void OpenBook(Book book) { if (!File.Exists(book.FilePath)) { MessageBox.Show("File không tồn tại"); return; } var form = new BookReaderForm(book); form.ShowDialog(); LoadBooks(); }
-
-        private void ShowBookMenu(Book book, BookCard card)
+        private void UpdateButtonText(Button btn, bool show)
         {
-            ContextMenuStrip menu = new ContextMenuStrip { BackColor = clrTopBar, ForeColor = Color.White, Renderer = new DarkMenuRenderer() };
-            if (!book.IsDeleted)
+            // Placeholder implementation - can be enhanced based on requirements
+            if (!show && btn.Tag != null)
             {
-                var editItem = new ToolStripMenuItem("✎  Sửa thông tin"); editItem.Click += (s, e) => { using (var editForm = new EditBookForm(book)) { if (editForm.ShowDialog() == DialogResult.OK) LoadBooks(); } }; menu.Items.Add(editItem);
-                menu.Items.Add(new ToolStripSeparator());
-                var openItem = new ToolStripMenuItem("📁  Mở thư mục"); openItem.Click += (s, e) => System.Diagnostics.Process.Start("explorer.exe", $"/select, \"{book.FilePath}\""); menu.Items.Add(openItem);
-                var delItem = new ToolStripMenuItem("🗑️  Xóa"); delItem.Click += (s, e) => { DataManager.Instance.DeleteBook(book.Id); LoadBooks(); }; menu.Items.Add(delItem);
+                string fullText = btn.Tag.ToString();
+                // Extract emoji only if text contains emoji
+                if (fullText.Contains(" "))
+                {
+                    btn.Text = fullText.Split(' ')[0]; // Get emoji part
+                }
             }
-            else
+            else if (btn.Tag != null)
             {
-                var restore = new ToolStripMenuItem("♻️  Khôi phục"); restore.Click += (s, e) => { DataManager.Instance.RestoreBook(book.Id); LoadBooks(); }; menu.Items.Add(restore);
+                btn.Text = btn.Tag.ToString();
             }
-            menu.Show(card, new Point(0, card.Height));
         }
-
-        private void BtnAddShelf_Click(object sender, EventArgs e) { if (_currentUser == null) return; using (var dlg = new AddShelfDialog()) if (dlg.ShowDialog() == DialogResult.OK) { DataManager.Instance.AddShelf(dlg.ShelfName, dlg.ShelfDescription); RefreshSidebarShelves(); } }
-        private void BtnManageShelf_Click(object sender, EventArgs e) { if (_currentUser == null) return; using (var dlg = new ManageShelfDialog()) { dlg.ShowDialog(); RefreshSidebarShelves(); } }
-        private void SortButton_Click(object sender, EventArgs e) { /* Sort logic */ }
-        private void UpdateButtonText(Button btn, bool show) { /* ... */ }
 
         #endregion
     }
@@ -941,6 +1052,7 @@ namespace WindowsFormsApp1
             this.Size = new Size(150, 40);
             this.BackColor = Color.MediumSlateBlue;
             this.ForeColor = Color.White;
+            this.Font = new Font("Segoe UI", 10, FontStyle.Bold);
             this.Resize += (s, e) => { if (BorderRadius > this.Height) BorderRadius = this.Height; };
         }
 

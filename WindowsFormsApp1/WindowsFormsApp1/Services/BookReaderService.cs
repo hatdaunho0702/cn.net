@@ -9,9 +9,10 @@ using VersOne.Epub;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 using System.Text;
-using WindowsFormsApp1.Models; // Thêm using
+using WindowsFormsApp1.Models;
+using WindowsFormsApp1.Data;
 
-namespace WindowsFormsApp1.Services // Đổi namespace
+namespace WindowsFormsApp1.Services
 {
     public class BookReaderService
     {

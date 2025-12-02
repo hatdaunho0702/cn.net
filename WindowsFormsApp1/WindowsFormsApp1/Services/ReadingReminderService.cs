@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WindowsFormsApp1.Data;
+using WindowsFormsApp1.Constants;
 
 namespace WindowsFormsApp1.Services
 {
@@ -12,7 +13,7 @@ namespace WindowsFormsApp1.Services
     public class ReadingReminderService
     {
         private static ReadingReminderService _instance;
-        private System.Threading.Timer _reminderTimer; // Sử dụng System.Threading.Timer
+        private System.Threading.Timer _reminderTimer;
         private int _userId;
         private bool _isRunning;
 
@@ -42,8 +43,13 @@ namespace WindowsFormsApp1.Services
             _userId = userId;
             _isRunning = true;
 
-            // Kiểm tra mỗi 1 giờ
-            _reminderTimer = new System.Threading.Timer(CheckAndSendReminder, null, TimeSpan.Zero, TimeSpan.FromHours(1));
+            // Kiểm tra theo interval đã định nghĩa trong constants
+            _reminderTimer = new System.Threading.Timer(
+                CheckAndSendReminder, 
+                null, 
+                TimeSpan.Zero, 
+                TimeSpan.FromHours(AppConstants.REMINDER_CHECK_INTERVAL_HOURS)
+            );
         }
 
         /// <summary>
@@ -66,9 +72,10 @@ namespace WindowsFormsApp1.Services
         {
             try
             {
-                // Chỉ nhắc nhở vào khung giờ từ 8h-22h
+                // Chỉ nhắc nhở trong khung giờ quy định
                 int currentHour = DateTime.Now.Hour;
-                if (currentHour < 8 || currentHour > 22)
+                if (currentHour < AppConstants.REMINDER_START_HOUR || 
+                    currentHour > AppConstants.REMINDER_END_HOUR)
                     return;
 
                 // Kiểm tra xem hôm nay đã đọc chưa
@@ -141,10 +148,10 @@ namespace WindowsFormsApp1.Services
                     BalloonTipIcon = ToolTipIcon.Info
                 };
 
-                notifyIcon.ShowBalloonTip(5000);
+                notifyIcon.ShowBalloonTip(AppConstants.NOTIFICATION_DISPLAY_TIME);
 
-                // Xóa sau 10 giâys
-                Task.Delay(10000).ContinueWith(t =>
+                // Xóa sau thời gian quy định
+                Task.Delay(AppConstants.NOTIFICATION_CLEANUP_TIME).ContinueWith(t =>
                 {
                     notifyIcon.Visible = false;
                     notifyIcon.Dispose();

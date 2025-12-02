@@ -1,20 +1,24 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using RestSharp;
 using Newtonsoft.Json.Linq;
 
-namespace WindowsFormsApp1.Data
+namespace WindowsFormsApp1.Services
 {
+    /// <summary>
+    /// Service t�ch h?p v?i Google Gemini AI
+    /// </summary>
     public class GeminiService
     {
-        // ⚠️ Thay API Key MỚI của bạn vào đây (Key cũ đã bị lộ, hãy xóa đi)
+        // ?? Thay API Key M?I c?a b?n v�o ��y (Key c? �? b? l?, h?y x�a �i)
         private const string API_KEY = "AIzaSyDsJXnCt0OMttowASMb7gqtX3eRr-34uNc";
 
-        // SỬA LỖI Ở ĐÂY: Dùng v1beta thay vì v1
+        // S? d?ng v1beta endpoint
         private const string API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
-
-
+        /// <summary>
+        /// H?i AI v? n?i dung s�ch
+        /// </summary>
         public async Task<string> AskGemini(string contextText, string userPrompt)
         {
             try
@@ -27,24 +31,25 @@ namespace WindowsFormsApp1.Data
                 request.AddQueryParameter("key", API_KEY);
                 request.AddHeader("Content-Type", "application/json");
 
-                // [SỬA ĐỔI TẠI ĐÂY] Tăng giới hạn từ 30,000 lên 2,000,000 ký tự (đủ cho sách dày)
-                // Gemini Flash hỗ trợ context rất lớn nên không cần cắt quá ngắn.
-                string safeContext = contextText.Length > 2000000 ? contextText.Substring(0, 2000000) : contextText;
+                // Gi?i h?n context 2,000,000 k? t? (Gemini Flash h? tr? context l?n)
+                string safeContext = contextText.Length > 2000000 
+                    ? contextText.Substring(0, 2000000) 
+                    : contextText;
 
-                string finalPrompt = $"Dựa vào nội dung sách sau:\n---\n{safeContext}\n---\nHãy trả lời câu hỏi: {userPrompt}";
+                string finalPrompt = $"D?a v�o n?i dung s�ch sau:\n---\n{safeContext}\n---\nH?y tr? l?i c�u h?i: {userPrompt}";
 
                 var body = new
                 {
                     contents = new[]
                     {
-                new
-                {
-                    parts = new[]
-                    {
-                        new { text = finalPrompt }
+                        new
+                        {
+                            parts = new[]
+                            {
+                                new { text = finalPrompt }
+                            }
+                        }
                     }
-                }
-            }
                 };
 
                 request.AddJsonBody(body);
@@ -53,17 +58,17 @@ namespace WindowsFormsApp1.Data
                 if (response.IsSuccessful)
                 {
                     var jsonResponse = JObject.Parse(response.Content);
-                    string aiReply = jsonResponse["candidates"]?[0]?["content"]?["sparts"]?[0]?["text"]?.ToString();
-                    return aiReply ?? "AI không trả lời (null).";
+                    string aiReply = jsonResponse["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
+                    return aiReply ?? "AI kh�ng tr? l?i (null).";
                 }
                 else
                 {
-                    return $"Lỗi API ({response.StatusCode}): {response.Content}";
+                    return $"L?i API ({response.StatusCode}): {response.Content}";
                 }
             }
             catch (Exception ex)
             {
-                return $"Lỗi hệ thống: {ex.Message}";
+                return $"L?i h? th?ng: {ex.Message}";
             }
         }
     }

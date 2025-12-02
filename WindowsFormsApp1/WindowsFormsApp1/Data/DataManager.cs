@@ -5,7 +5,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Linq;
 using System.Data;
-using System.Windows.Forms; // Thêm để dùng MessageBox
+using System.Windows.Forms;
+using WindowsFormsApp1.Models; // Thêm using cho Models
 
 namespace WindowsFormsApp1.Data
 {

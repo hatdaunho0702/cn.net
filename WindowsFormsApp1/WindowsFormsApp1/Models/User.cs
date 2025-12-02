@@ -1,11 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace WindowsFormsApp1.Data
+namespace WindowsFormsApp1.Models
 {
+    /// <summary>
+    /// Model ð?i di?n cho ngý?i dùng trong h? th?ng
+    /// </summary>
     public class User
     {
         public int Id { get; set; }

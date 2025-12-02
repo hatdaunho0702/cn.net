@@ -1,7 +1,10 @@
 using System;
 
-namespace WindowsFormsApp1.Data
+namespace WindowsFormsApp1.Models
 {
+    /// <summary>
+    /// Model �?i di?n cho m?t cu?n s�ch trong h? th?ng
+    /// </summary>
     public class Book
     {
         public int Id { get; set; }
@@ -14,7 +17,7 @@ namespace WindowsFormsApp1.Data
         public int TotalPages { get; set; }
         public int CurrentPage { get; set; }
 
-        // Các trường mới
+        // C�c tr�?ng m?i
         public string MD5 { get; set; }
         public int FileSizeKB { get; set; }
         public int Rating { get; set; }
@@ -33,7 +36,6 @@ namespace WindowsFormsApp1.Data
             IsDeleted = false;
         }
 
-        // --- ĐÂY LÀ HÀM BẠN ĐANG THIẾU ---
         public string GetProgressText()
         {
             return $"{Progress:F1}%";
