@@ -53,7 +53,7 @@ namespace WindowsFormsApp1.Data
                 if (response.IsSuccessful)
                 {
                     var jsonResponse = JObject.Parse(response.Content);
-                    string aiReply = jsonResponse["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
+                    string aiReply = jsonResponse["candidates"]?[0]?["content"]?["sparts"]?[0]?["text"]?.ToString();
                     return aiReply ?? "AI không trả lời (null).";
                 }
                 else

@@ -122,6 +122,7 @@
     <Compile Include="Data\DatabaseConnection.cs" />
     <Compile Include="Data\DataManager.cs" />
     <Compile Include="Data\Highlight.cs" />
+    <Compile Include="Data\ReadingGoal.cs" />
     <Compile Include="Data\ReportService.cs" />
     <Compile Include="Data\Shelf.cs" />
     <Compile Include="Data\User.cs" />
@@ -147,6 +148,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Data\GeminiService.cs" />
+    <Compile Include="Forms\ReadingGoalsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="LoginForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -180,6 +184,7 @@
     <Compile Include="RegisterForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Services\ReadingReminderService.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">
@@ -193,15 +198,19 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="HUONG_DAN_MUC_TIEU_DOC_SACH.md" />
+    <None Include="HUONG_DAN_UI_GOALS.md" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
+    <None Include="TOM_TAT_CHUC_NANG.md" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Database\AddBookReaderTables.sql" />
     <Content Include="Database\CreateBookReaderTables.sql" />
+    <Content Include="Database\CreateReadingGoalTables.sql" />
     <Content Include="Database\FixBookReaderTables.sql" />
     <Content Include="Database\InitializeDefaultShelves.sql" />
     <Content Include="Database\Migration_UpdateDatabase.sql" />

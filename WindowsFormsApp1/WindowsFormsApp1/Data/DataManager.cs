@@ -94,6 +94,43 @@ namespace WindowsFormsApp1.Data
             return null;
         }
 
+        // [MỚI] Lấy thông tin user theo ID
+        public User GetUserById(int userId)
+        {
+            string query = "SELECT MaNguoiDung, TenDangNhap, TenHienThi, Email FROM NguoiDung WHERE MaNguoiDung = @UserId";
+
+            try
+            {
+                using (var conn = DatabaseConnection.Instance.GetConnection())
+                {
+                    conn.Open();
+                    using (var cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@UserId", userId);
+
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new User
+                                {
+                                    Id = reader.GetInt32(0),
+                                    Username = reader.GetString(1),
+                                    DisplayName = reader.IsDBNull(2) ? reader.GetString(1) : reader.GetString(2),
+                                    Email = reader.IsDBNull(3) ? "" : reader.GetString(3)
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Lỗi lấy thông tin user: " + ex.Message);
+            }
+            return null;
+        }
+
         public User Register(string username, string password, string displayName, string email)
         {
             if (IsUserExists(username))
@@ -365,6 +402,12 @@ namespace WindowsFormsApp1.Data
         {
             string query = "DELETE FROM Sach WHERE MaSach = @Id";
             ExecuteSimpleNonQuery(query, "@Id", bookId);
+        }
+
+        public void PermanentDeleteBook(int bookId)
+        {
+            // Alias method for consistency
+            PermanentlyDeleteBook(bookId);
         }
 
         public void ToggleFavorite(int bookId)
@@ -764,7 +807,109 @@ namespace WindowsFormsApp1.Data
             ExecuteSimpleNonQuery(query, "@Id", id);
         }
 
-        // --- THÊM VÀO DataManager.cs ---
+        // Xóa tất cả ghi chú của user
+        public int DeleteAllNotes(int userId)
+        {
+            string countQuery = @"
+                SELECT COUNT(*) 
+                FROM GhiChu g
+                INNER JOIN Sach s ON g.MaSach = s.MaSach
+                WHERE s.MaNguoiDung = @Uid
+                AND g.GhiChuCuaNguoiDung IS NOT NULL 
+                AND g.GhiChuCuaNguoiDung <> ''";
+
+            string deleteQuery = @"
+                DELETE g
+                FROM GhiChu g
+                INNER JOIN Sach s ON g.MaSach = s.MaSach
+                WHERE s.MaNguoiDung = @Uid
+                AND g.GhiChuCuaNguoiDung IS NOT NULL 
+                AND g.GhiChuCuaNguoiDung <> ''";
+
+            try
+            {
+                using (var conn = DatabaseConnection.Instance.GetConnection())
+                {
+                    conn.Open();
+                    
+                    // Đếm số lượng trước khi xóa
+                    int count = 0;
+                    using (var cmdCount = new SqlCommand(countQuery, conn))
+                    {
+                        cmdCount.Parameters.AddWithValue("@Uid", userId);
+                        count = (int)cmdCount.ExecuteScalar();
+                    }
+
+                    // Thực hiện xóa
+                    if (count > 0)
+                    {
+                        using (var cmdDelete = new SqlCommand(deleteQuery, conn))
+                        {
+                            cmdDelete.Parameters.AddWithValue("@Uid", userId);
+                            cmdDelete.ExecuteNonQuery();
+                        }
+                    }
+
+                    return count;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Lỗi xóa ghi chú: " + ex.Message);
+            }
+        }
+
+        // Xóa tất cả đánh dấu của user
+        public int DeleteAllHighlights(int userId)
+        {
+            string countQuery = @"
+                SELECT COUNT(*) 
+                FROM GhiChu g
+                INNER JOIN Sach s ON g.MaSach = s.MaSach
+                WHERE s.MaNguoiDung = @Uid
+                AND (g.GhiChuCuaNguoiDung IS NULL OR g.GhiChuCuaNguoiDung = '')";
+
+            string deleteQuery = @"
+                DELETE g
+                FROM GhiChu g
+                INNER JOIN Sach s ON g.MaSach = s.MaSach
+                WHERE s.MaNguoiDung = @Uid
+                AND (g.GhiChuCuaNguoiDung IS NULL OR g.GhiChuCuaNguoiDung = '')";
+
+            try
+            {
+                using (var conn = DatabaseConnection.Instance.GetConnection())
+                {
+                    conn.Open();
+                    
+                    // Đếm số lượng trước khi xóa
+                    int count = 0;
+                    using (var cmdCount = new SqlCommand(countQuery, conn))
+                    {
+                        cmdCount.Parameters.AddWithValue("@Uid", userId);
+                        count = (int)cmdCount.ExecuteScalar();
+                    }
+
+                    // Thực hiện xóa
+                    if (count > 0)
+                    {
+                        using (var cmdDelete = new SqlCommand(deleteQuery, conn))
+                        {
+                            cmdDelete.Parameters.AddWithValue("@Uid", userId);
+                            cmdDelete.ExecuteNonQuery();
+                        }
+                    }
+
+                    return count;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Lỗi xóa đánh dấu: " + ex.Message);
+            }
+        }
+
+        // --- THÊM V ÀO DataManager.cs ---
 
         // 1. Xác thực mật khẩu hiện tại (Dùng cho bước yêu cầu nhập lại pass)
         public bool VerifyCurrentPassword(int userId, string password)
@@ -935,6 +1080,358 @@ namespace WindowsFormsApp1.Data
                 }
             }
             catch (Exception ex) { Console.WriteLine("Lỗi SQL: " + ex.Message); }
+        }
+
+        // ================= QUẢN LÝ MỤC TIÊU ĐỌC SÁCH =================
+
+        // Tạo mục tiêu mới
+        public int CreateReadingGoal(int userId, string goalType, int targetValue)
+        {
+            string query = @"
+                INSERT INTO MucTieuDocSach (MaNguoiDung, LoaiMucTieu, GiaTriMucTieu, NgayBatDau, DangHoatDong)
+                VALUES (@UserId, @Type, @Value, GETDATE(), 1);
+                SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+            using (var conn = DatabaseConnection.Instance.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    cmd.Parameters.AddWithValue("@Type", goalType);
+                    cmd.Parameters.AddWithValue("@Value", targetValue);
+                    return (int)cmd.ExecuteScalar();
+                }
+            }
+        }
+
+        // Lấy tất cả mục tiêu đang hoạt động
+        public List<ReadingGoal> GetActiveGoals(int userId)
+        {
+            string query = @"
+                SELECT * FROM MucTieuDocSach 
+                WHERE MaNguoiDung = @UserId AND DangHoatDong = 1
+                ORDER BY NgayBatDau DESC";
+
+            var list = new List<ReadingGoal>();
+            using (var conn = DatabaseConnection.Instance.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new ReadingGoal
+                            {
+                                Id = reader.GetInt32(0),
+                                UserId = reader.GetInt32(1),
+                                GoalType = reader.GetString(2),
+                                TargetValue = reader.GetInt32(3),
+                                StartDate = reader.GetDateTime(4),
+                                IsActive = reader.GetBoolean(5),
+                                CompletedDate = reader.IsDBNull(6) ? (DateTime?)null : reader.GetDateTime(6)
+                            });
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
+        // Cập nhật hoặc tắt mục tiêu
+        public void UpdateGoal(int goalId, bool isActive)
+        {
+            string query = "UPDATE MucTieuDocSach SET DangHoatDong = @Active WHERE MaMucTieu = @Id";
+            ExecuteSimpleNonQuery(query, new[]
+            {
+                new SqlParameter("@Active", isActive),
+                new SqlParameter("@Id", goalId)
+            });
+        }
+
+        // ================= QUẢN LÝ PHIÊN ĐỌC SÁCH =================
+
+        // Bắt đầu phiên đọc mới
+        public int StartReadingSession(int userId, int bookId)
+        {
+            string query = @"
+                INSERT INTO PhienDocSach (MaNguoiDung, MaSach, ThoiGianBatDau, NgayDoc)
+                VALUES (@UserId, @BookId, GETDATE(), CAST(GETDATE() AS DATE));
+                SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+            using (var conn = DatabaseConnection.Instance.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    cmd.Parameters.AddWithValue("@BookId", bookId);
+                    return (int)cmd.ExecuteScalar();
+                }
+            }
+        }
+
+        // Kết thúc phiên đọc và tính số phút
+        public void EndReadingSession(int sessionId)
+        {
+            string query = @"
+                UPDATE PhienDocSach 
+                SET ThoiGianKetThuc = GETDATE(),
+                    SoPhutDoc = DATEDIFF(MINUTE, ThoiGianBatDau, GETDATE())
+                WHERE MaPhien = @SessionId";
+
+            ExecuteSimpleNonQuery(query, new[] { new SqlParameter("@SessionId", sessionId) });
+        }
+
+        // Lấy tổng số phút đọc trong ngày
+        public int GetTodayReadingMinutes(int userId)
+        {
+            string query = @"
+                SELECT ISNULL(SUM(SoPhutDoc), 0)
+                FROM PhienDocSach
+                WHERE MaNguoiDung = @UserId 
+                AND NgayDoc = CAST(GETDATE() AS DATE)";
+
+            using (var conn = DatabaseConnection.Instance.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    return (int)cmd.ExecuteScalar();
+                }
+            }
+        }
+
+        // Lấy số cuốn đã đọc trong năm
+        public int GetYearlyBooksRead(int userId)
+        {
+            string query = @"
+                SELECT COUNT(DISTINCT MaSach)
+                FROM PhienDocSach
+                WHERE MaNguoiDung = @UserId 
+                AND YEAR(NgayDoc) = YEAR(GETDATE())
+                AND SoPhutDoc >= 10"; // Chỉ tính sách đọc ít nhất 10 phút
+
+            using (var conn = DatabaseConnection.Instance.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    return (int)cmd.ExecuteScalar();
+                }
+            }
+        }
+
+        // [MỚI] Lấy số cuốn đã đọc trong tháng
+        public int GetMonthlyBooksRead(int userId)
+        {
+            string query = @"
+                SELECT COUNT(DISTINCT MaSach)
+                FROM PhienDocSach
+                WHERE MaNguoiDung = @UserId 
+                AND YEAR(NgayDoc) = YEAR(GETDATE())
+                AND MONTH(NgayDoc) = MONTH(GETDATE())
+                AND SoPhutDoc >= 10"; // Chỉ tính sách đọc ít nhất 10 phút
+
+            using (var conn = DatabaseConnection.Instance.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    return (int)cmd.ExecuteScalar();
+                }
+            }
+        }
+
+        // Lấy thống kê đọc sách 7 ngày gần nhất
+        public List<DailyReadingStats> GetWeeklyStats(int userId)
+        {
+            string query = @"
+                SELECT 
+                    NgayDoc,
+                    SUM(SoPhutDoc) AS TotalMinutes,
+                    COUNT(DISTINCT MaSach) AS BooksRead
+                FROM PhienDocSach
+                WHERE MaNguoiDung = @UserId
+                AND NgayDoc >= DATEADD(DAY, -7, CAST(GETDATE() AS DATE))
+                GROUP BY NgayDoc
+                ORDER BY NgayDoc DESC";
+
+            var list = new List<DailyReadingStats>();
+            using (var conn = DatabaseConnection.Instance.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new DailyReadingStats
+                            {
+                                Date = reader.GetDateTime(0),
+                                TotalMinutes = reader.GetInt32(1),
+                                BooksRead = reader.GetInt32(2)
+                            });
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
+        // ================= QUẢN LÝ STREAK (CHUỖI NGÀY ĐỌC) =================
+
+        // Cập nhật streak sau mỗi phiên đọc
+        public void UpdateReadingStreak(int userId)
+        {
+            string checkQuery = "SELECT * FROM ChuoiNgayDocSach WHERE MaNguoiDung = @UserId";
+            string insertQuery = @"
+                INSERT INTO ChuoiNgayDocSach (MaNguoiDung, SoNgayHienTai, SoNgayDaiNhat, NgayDocGanNhat)
+                VALUES (@UserId, 1, 1, CAST(GETDATE() AS DATE))";
+            
+            string updateQuery = @"
+                UPDATE ChuoiNgayDocSach
+                SET SoNgayHienTai = CASE 
+                        WHEN DATEDIFF(DAY, NgayDocGanNhat, CAST(GETDATE() AS DATE)) = 1 THEN SoNgayHienTai + 1
+                        WHEN DATEDIFF(DAY, NgayDocGanNhat, CAST(GETDATE() AS DATE)) = 0 THEN SoNgayHienTai
+                        ELSE 1
+                    END,
+                    SoNgayDaiNhat = CASE
+                        WHEN DATEDIFF(DAY, NgayDocGanNhat, CAST(GETDATE() AS DATE)) = 1 AND (SoNgayHienTai + 1) > SoNgayDaiNhat THEN SoNgayHienTai + 1
+                        ELSE SoNgayDaiNhat
+                    END,
+                    NgayDocGanNhat = CAST(GETDATE() AS DATE)
+                WHERE MaNguoiDung = @UserId";
+
+            using (var conn = DatabaseConnection.Instance.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand(checkQuery, conn))
+                {
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    bool exists = cmd.ExecuteScalar() != null;
+
+                    if (!exists)
+                    {
+                        cmd.CommandText = insertQuery;
+                        cmd.ExecuteNonQuery();
+                    }
+                    else
+                    {
+                        cmd.CommandText = updateQuery;
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+        }
+
+        // Lấy thông tin streak
+        public ReadingStreak GetReadingStreak(int userId)
+        {
+            string query = "SELECT * FROM ChuoiNgayDocSach WHERE MaNguoiDung = @UserId";
+
+            using (var conn = DatabaseConnection.Instance.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new ReadingStreak
+                            {
+                                UserId = reader.GetInt32(0),
+                                CurrentStreak = reader.GetInt32(1),
+                                LongestStreak = reader.GetInt32(2),
+                                LastReadDate = reader.GetDateTime(3)
+                            };
+                        }
+                    }
+                }
+            }
+
+            return new ReadingStreak { UserId = userId, CurrentStreak = 0, LongestStreak = 0, LastReadDate = DateTime.Today };
+        }
+
+        // ================= QUẢN LÝ NHẮC NHỞ (NOTIFICATIONS) =================
+
+        // Tạo nhắc nhở mới
+        public void CreateNotification(int userId, string message)
+        {
+            string query = @"
+                INSERT INTO LichSuNhacNho (MaNguoiDung, ThoiGianNhacNho, NoiDungNhacNho, DaXem)
+                VALUES (@UserId, GETDATE(), @Message, 0)";
+
+            ExecuteSimpleNonQuery(query, new[]
+            {
+                new SqlParameter("@UserId", userId),
+                new SqlParameter("@Message", message)
+            });
+        }
+
+        // Lấy các nhắc nhở chưa đọc
+        public List<string> GetUnreadNotifications(int userId)
+        {
+            string query = @"
+                SELECT NoiDungNhacNho 
+                FROM LichSuNhacNho 
+                WHERE MaNguoiDung = @UserId AND DaXem = 0
+                ORDER BY ThoiGianNhacNho DESC";
+
+            var list = new List<string>();
+            using (var conn = DatabaseConnection.Instance.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(reader.GetString(0));
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
+        // Đánh dấu tất cả nhắc nhở đã đọc
+        public void MarkNotificationsAsRead(int userId)
+        {
+            string query = "UPDATE LichSuNhacNho SET DaXem = 1 WHERE MaNguoiDung = @UserId";
+            ExecuteSimpleNonQuery(query, new[] { new SqlParameter("@UserId", userId) });
+        }
+
+        // Kiểm tra xem hôm nay đã đọc chưa (để gửi nhắc nhở)
+        public bool HasReadToday(int userId)
+        {
+            string query = @"
+                SELECT COUNT(*) 
+                FROM PhienDocSach 
+                WHERE MaNguoiDung = @UserId 
+                AND NgayDoc = CAST(GETDATE() AS DATE)";
+
+            using (var conn = DatabaseConnection.Instance.GetConnection())
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    return (int)cmd.ExecuteScalar() > 0;
+                }
+            }
         }
     }
 }

@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
+using System.ComponentModel; // [MỚI]
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Linq;
 using WindowsFormsApp1.Data;
 
 namespace WindowsFormsApp1.Forms
@@ -21,6 +22,10 @@ namespace WindowsFormsApp1.Forms
 
         // [QUAN TRỌNG] Biến cờ xác định đây có phải sách PDF không
         private bool _isPdf = false;
+
+        // [MỚI] Tracking reading session
+        private int _currentSessionId = 0;
+        private DateTime _sessionStartTime;
 
         // ======================= STATE =======================
         private int _currentChapterIndex = 0;
@@ -97,6 +102,9 @@ namespace WindowsFormsApp1.Forms
             InitializeFloatingMenu();
             InitializeGeminiChatUI();
 
+            // [MỚI] Bắt đầu tracking reading session
+            StartReadingSession();
+
             // Load sự kiện
             this.Load += BookReaderForm_Load;
             this.FormClosing += BookReaderForm_FormClosing;
@@ -141,7 +149,11 @@ namespace WindowsFormsApp1.Forms
             this.SuspendLayout();
 
             var chapter = _chapters[index];
+            
+            // Clear existing content and free memory
             contentBox.Clear();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
 
             // Tiêu đề
             contentBox.SelectionAlignment = HorizontalAlignment.Center;
@@ -194,6 +206,7 @@ namespace WindowsFormsApp1.Forms
 
         private void InsertImageToRichTextBox(Image img)
         {
+            Bitmap resizedBitmap = null;
             try
             {
                 int containerWidth = contentBox.ClientSize.Width;
@@ -214,7 +227,7 @@ namespace WindowsFormsApp1.Forms
                     targetHeight = img.Height;
                 }
 
-                Bitmap resizedBitmap = new Bitmap(targetWidth, targetHeight);
+                resizedBitmap = new Bitmap(targetWidth, targetHeight);
                 resizedBitmap.SetResolution(96, 96);
 
                 using (Graphics g = Graphics.FromImage(resizedBitmap))
@@ -251,9 +264,19 @@ namespace WindowsFormsApp1.Forms
                 contentBox.SelectionRightIndent = 20;
                 contentBox.AppendText("\n");
             }
-            catch
+            catch (Exception ex)
             {
-                contentBox.AppendText("\n[Ảnh lỗi]\n");
+                contentBox.AppendText("\n[Ảnh lỗi: " + ex.Message + "]\n");
+            }
+            finally
+            {
+                if (resizedBitmap != null)
+                {
+                    resizedBitmap.Dispose();
+                    resizedBitmap = null;
+                }
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
             }
         }
 
@@ -531,8 +554,99 @@ namespace WindowsFormsApp1.Forms
         private void ReloadHighlights(int chapterIndex) { var highlights = DataManager.Instance.GetHighlightsForBook(_book.Id); int originalStart = contentBox.SelectionStart; foreach (var hl in highlights) { if (hl.ChapterIndex == chapterIndex) { if (hl.StartIndex >= 0 && (hl.StartIndex + hl.Length) <= contentBox.TextLength) { contentBox.Select(hl.StartIndex, hl.Length); try { contentBox.SelectionBackColor = ColorTranslator.FromHtml(hl.ColorHex); } catch { contentBox.SelectionBackColor = Color.Yellow; } } } } contentBox.Select(originalStart, 0); }
         private void NavigateChapter(int step) { int newIndex = _currentChapterIndex + step; if (_chapters != null && newIndex >= 0 && newIndex < _chapters.Count) { SaveCurrentProgress(); _currentChapterIndex = newIndex; DisplayFullChapter(_currentChapterIndex); } }
         private void SaveCurrentProgress() { if (_chapters == null || _chapters.Count == 0) return; int currentPos = contentBox.GetCharIndexFromPosition(new Point(10, 10)); _readerService.SaveReadingPosition(_book.Id, DataManager.Instance.GetCurrentUser(), _currentChapterIndex, currentPos); }
-        private void BookReaderForm_FormClosing(object sender, FormClosingEventArgs e) { SaveCurrentProgress(); }
+        private void BookReaderForm_FormClosing(object sender, FormClosingEventArgs e) 
+        { 
+            // [MỚI] Kết thúc reading session trước khi đóng
+            EndReadingSession();
+
+            SaveCurrentProgress();
+            
+            // Clean up resources
+            if (contentBox != null)
+            {
+                contentBox.Clear();
+            }
+            
+            // Dispose chapter objects properly
+            if (_chapters != null)
+            {
+                foreach (var chapter in _chapters)
+                {
+                    if (chapter != null)
+                    {
+                        chapter.Dispose();
+                    }
+                }
+                _chapters.Clear();
+            }
+            
+            // Force garbage collection
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
         private void BookReaderForm_KeyDown(object sender, KeyEventArgs e) { if (e.KeyCode == Keys.Left) NavigateChapter(-1); else if (e.KeyCode == Keys.Right) NavigateChapter(1); else if (e.KeyCode == Keys.Escape) this.Close(); }
+
+        // --- [MỚI] CÁC HÀM TRACKING ĐỌC SÁCH ---
+        
+        private void StartReadingSession()
+        {
+            try
+            {
+                int userId = DataManager.Instance.GetCurrentUser();
+                _currentSessionId = DataManager.Instance.StartReadingSession(userId, _book.Id);
+                _sessionStartTime = DateTime.Now;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Lỗi bắt đầu session: " + ex.Message);
+            }
+        }
+
+        private void EndReadingSession()
+        {
+            try
+            {
+                if (_currentSessionId > 0)
+                {
+                    DataManager.Instance.EndReadingSession(_currentSessionId);
+                    
+                    // Cập nhật streak
+                    int userId = DataManager.Instance.GetCurrentUser();
+                    DataManager.Instance.UpdateReadingStreak(userId);
+                    
+                    // Kiểm tra và gửi notification nếu đạt mục tiêu
+                    CheckAndNotifyGoalAchievement();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Lỗi kết thúc session: " + ex.Message);
+            }
+        }
+
+        private void CheckAndNotifyGoalAchievement()
+        {
+            try
+            {
+                int userId = DataManager.Instance.GetCurrentUser();
+                int todayMinutes = DataManager.Instance.GetTodayReadingMinutes(userId);
+                
+                var dailyGoal = DataManager.Instance.GetActiveGoals(userId)
+                    .FirstOrDefault(g => g.GoalType == "DAILY_MINUTES");
+
+                if (dailyGoal != null && todayMinutes >= dailyGoal.TargetValue)
+                {
+                    // Chỉ thông báo 1 lần trong ngày
+                    if (!DataManager.Instance.HasReadToday(userId))
+                    {
+                        DataManager.Instance.CreateNotification(userId, 
+                            $"🎉 Chúc mừng! Bạn đã hoàn thành mục tiêu đọc {dailyGoal.TargetValue} phút hôm nay!");
+                    }
+                }
+            }
+            catch { }
+        }
     }
 
     public class ModernColorTable : ProfessionalColorTable { public override Color MenuItemSelected => Color.FromArgb(230, 230, 230); public override Color MenuItemBorder => Color.Transparent; public override Color MenuBorder => Color.LightGray; }

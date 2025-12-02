@@ -12,13 +12,48 @@ using System.Text;
 
 namespace WindowsFormsApp1.Data
 {
-    public class BookChapter
+    public class BookChapter : IDisposable
     {
         public int ChapterNumber { get; set; }
         public string ChapterTitle { get; set; }
         public string Content { get; set; }
         // Lưu trữ ảnh của chương này (Key: mã placeholder, Value: dữ liệu ảnh)
         public Dictionary<string, Image> Images { get; set; } = new Dictionary<string, Image>();
+
+        private bool _disposed = false;
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    if (Images != null)
+                    {
+                        foreach (var img in Images.Values)
+                        {
+                            if (img != null)
+                            {
+                                img.Dispose();
+                            }
+                        }
+                        Images.Clear();
+                    }
+                }
+                _disposed = true;
+            }
+        }
+
+        ~BookChapter()
+        {
+            Dispose(false);
+        }
     }
 
     public class BookReaderService
@@ -171,26 +206,36 @@ namespace WindowsFormsApp1.Data
                         string text = page.Text;
                         var images = new Dictionary<string, Image>();
 
-                        // Lấy ảnh từ PDF
+                        // Lấy ảnh từ PDF - Giới hạn số lượng ảnh mỗi trang
+                        int imageCount = 0;
+                        const int MAX_IMAGES_PER_PAGE = 10;
+
                         foreach (var img in page.GetImages())
                         {
+                            if (imageCount >= MAX_IMAGES_PER_PAGE) break;
+
                             try
                             {
                                 byte[] imgBytes = null;
                                 if (img.TryGetPng(out byte[] png)) imgBytes = png;
                                 else imgBytes = img.RawBytes.ToArray();
 
-                                if (imgBytes != null)
+                                if (imgBytes != null && imgBytes.Length > 0)
                                 {
                                     using (var ms = new MemoryStream(imgBytes))
                                     {
                                         // Clone Bitmap để tránh lỗi GDI+ khi stream đóng
                                         using (var temp = Image.FromStream(ms))
                                         {
-                                            Image image = new Bitmap(temp);
-                                            string key = $"{{{{IMG:{Guid.NewGuid()}}}}}";
-                                            images.Add(key, image);
-                                            text += $"\n\n{key}\n\n";
+                                            // Chỉ tải ảnh không quá lớn (tránh OOM)
+                                            if (temp.Width <= 3000 && temp.Height <= 3000)
+                                            {
+                                                Image image = new Bitmap(temp);
+                                                string key = $"{{{{IMG:{Guid.NewGuid()}}}}}";
+                                                images.Add(key, image);
+                                                text += $"\n\n{key}\n\n";
+                                                imageCount++;
+                                            }
                                         }
                                     }
                                 }
@@ -261,8 +306,14 @@ namespace WindowsFormsApp1.Data
             string processedText = html;
             var imgRegex = new Regex(@"<img[^>]+src\s*=\s*['""]([^'""]+)['""][^>]*>", RegexOptions.IgnoreCase);
 
+            int imageCount = 0;
+            const int MAX_IMAGES_PER_CHAPTER = 20;
+
             processedText = imgRegex.Replace(processedText, match =>
             {
+                if (imageCount >= MAX_IMAGES_PER_CHAPTER)
+                    return "[Ảnh bỏ qua do giới hạn]";
+
                 string src = match.Groups[1].Value;
                 src = System.Net.WebUtility.UrlDecode(src);
                 string fileName = Path.GetFileName(src);
@@ -279,10 +330,19 @@ namespace WindowsFormsApp1.Data
                                 {
                                     using (var temp = Image.FromStream(ms))
                                     {
-                                        Image img = new Bitmap(temp);
-                                        string uniqueKey = $"{{{{IMG:{Guid.NewGuid()}}}}}";
-                                        images.Add(uniqueKey, img);
-                                        return $"\n\n{uniqueKey}\n\n";
+                                        // Chỉ tải ảnh không quá lớn (tránh OOM)
+                                        if (temp.Width <= 3000 && temp.Height <= 3000)
+                                        {
+                                            Image img = new Bitmap(temp);
+                                            string uniqueKey = $"{{{{IMG:{Guid.NewGuid()}}}}}";
+                                            images.Add(uniqueKey, img);
+                                            imageCount++;
+                                            return $"\n\n{uniqueKey}\n\n";
+                                        }
+                                        else
+                                        {
+                                            return "[Ảnh quá lớn]";
+                                        }
                                     }
                                 }
                             }
