@@ -1,198 +1,189 @@
 ﻿using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using WindowsFormsApp1.Data;
-using WindowsFormsApp1.Models; // Thêm using
+using WindowsFormsApp1.Models;
+using WindowsFormsApp1.Utils;
 
 namespace WindowsFormsApp1.Forms
 {
     public partial class RegisterForm : Form
     {
         public User RegisteredUser { get; private set; }
-        private TextBox txtUser, txtPass, txtConfirm, txtName, txtEmail;
 
         public RegisterForm()
         {
-            InitializeCustomUI();
+            InitializeComponent();
+            ApplyStyles();
         }
 
-        private void InitializeCustomUI()
+        private void ApplyStyles()
         {
-            // --- Form Settings ---
-            this.Text = "Koodo Reader - Đăng Ký";
-            this.Size = new Size(400, 600);
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.BackColor = Color.FromArgb(32, 32, 32);
-            this.ForeColor = Color.White;
-            this.FormBorderStyle = FormBorderStyle.None;
-            this.Padding = new Padding(2);
+            // Bo góc cho các input containers
+            UIHelper.RoundPanel(pnlUserContainer, 8);
+            UIHelper.RoundPanel(pnlNameContainer, 8);
+            UIHelper.RoundPanel(pnlEmailContainer, 8);
+            UIHelper.RoundPanel(pnlPassContainer, 8);
+            UIHelper.RoundPanel(pnlConfirmContainer, 8);
 
-            // --- Custom Title Bar ---
-            Panel titleBar = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = Color.Transparent };
-            titleBar.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(Handle, 0xA1, 0x2, 0); } };
+            // Bo góc cho button
+            UIHelper.RoundButton(btnRegister, 8);
 
-            Button btnClose = new Button
-            {
-                Text = "✕",
-                Dock = DockStyle.Right,
-                Width = 40,
-                FlatStyle = FlatStyle.Flat,
-                ForeColor = Color.Gray,
-                BackColor = Color.Transparent
-            };
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.Click += (s, e) => this.Close();
-            btnClose.MouseEnter += (s, e) => { btnClose.BackColor = Color.Red; btnClose.ForeColor = Color.White; };
-            btnClose.MouseLeave += (s, e) => { btnClose.BackColor = Color.Transparent; btnClose.ForeColor = Color.Gray; };
-            titleBar.Controls.Add(btnClose);
-            this.Controls.Add(titleBar);
-
-            // --- Main Content Panel ---
-            Panel mainPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(40) };
-
-            // Title
-            Label lblTitle = new Label
-            {
-                Text = "Create Account",
-                Font = new Font("Segoe UI", 18, FontStyle.Bold),
-                ForeColor = Color.White,
-                AutoSize = true,
-                Location = new Point(100, 20)
-            };
-
-            int y = 80;
-            int gap = 65;
-
-            // 1. Username
-            Label lblUser = CreateLabel("USERNAME", y);
-            txtUser = CreateStyledTextBox(y + 25);
-            mainPanel.Controls.Add(lblUser);
-            mainPanel.Controls.Add(txtUser);
-
-            y += gap;
-            // 2. Display Name
-            Label lblName = CreateLabel("DISPLAY NAME", y);
-            txtName = CreateStyledTextBox(y + 25);
-            mainPanel.Controls.Add(lblName);
-            mainPanel.Controls.Add(txtName);
-
-            y += gap;
-            // 3. Email
-            Label lblEmail = CreateLabel("EMAIL", y);
-            txtEmail = CreateStyledTextBox(y + 25);
-            mainPanel.Controls.Add(lblEmail);
-            mainPanel.Controls.Add(txtEmail);
-
-            y += gap;
-            // 4. Password
-            Label lblPass = CreateLabel("PASSWORD", y);
-            txtPass = CreateStyledTextBox(y + 25);
-            txtPass.PasswordChar = '•';
-            mainPanel.Controls.Add(lblPass);
-            mainPanel.Controls.Add(txtPass);
-
-            y += gap;
-            // 5. Confirm Password
-            Label lblConfirm = CreateLabel("CONFIRM PASSWORD", y);
-            txtConfirm = CreateStyledTextBox(y + 25);
-            txtConfirm.PasswordChar = '•';
-            mainPanel.Controls.Add(lblConfirm);
-            mainPanel.Controls.Add(txtConfirm);
-
-            y += 80;
-            // Register Button
-            Button btnReg = new Button
-            {
-                Text = "REGISTER",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Location = new Point(40, y),
-                Size = new Size(320, 45),
-                BackColor = Color.FromArgb(0, 120, 215),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
-            };
-            btnReg.FlatAppearance.BorderSize = 0;
-            btnReg.Click += BtnReg_Click;
-            mainPanel.Controls.Add(btnReg);
-
-            // Login Link
-            Label lblLogin = new Label
-            {
-                Text = "Already have an account? Login",
-                Font = new Font("Segoe UI", 9, FontStyle.Underline),
-                ForeColor = Color.Gray,
-                AutoSize = true,
-                Cursor = Cursors.Hand,
-                Location = new Point(105, y + 60)
-            };
-            lblLogin.Click += (s, e) => { this.DialogResult = DialogResult.Retry; this.Close(); };
-            lblLogin.MouseEnter += (s, e) => lblLogin.ForeColor = Color.White;
-            lblLogin.MouseLeave += (s, e) => lblLogin.ForeColor = Color.Gray;
-            mainPanel.Controls.Add(lblLogin);
-
-            mainPanel.Controls.Add(lblTitle);
-            this.Controls.Add(mainPanel);
-
-            // Paint Border
-            this.Paint += (s, e) => { ControlPaint.DrawBorder(e.Graphics, this.ClientRectangle, Color.FromArgb(60, 60, 60), ButtonBorderStyle.Solid); };
+            // Enable double buffering
+            this.DoubleBuffered = true;
         }
 
-        private Label CreateLabel(string text, int y)
+        #region Event Handlers - Title Bar
+
+        private void TitleBar_MouseDown(object sender, MouseEventArgs e)
         {
-            return new Label
+            if (e.Button == MouseButtons.Left)
             {
-                Text = text,
-                Font = new Font("Segoe UI", 8, FontStyle.Bold),
-                ForeColor = Color.Gray,
-                Location = new Point(40, y),
-                AutoSize = true
-            };
+                ReleaseCapture();
+                SendMessage(Handle, 0xA1, 0x2, 0);
+            }
         }
 
-        private TextBox CreateStyledTextBox(int y)
+        private void BtnClose_Click(object sender, EventArgs e)
         {
-            return new TextBox
-            {
-                Location = new Point(40, y),
-                Size = new Size(320, 30),
-                Font = new Font("Segoe UI", 11),
-                BackColor = Color.FromArgb(45, 45, 48),
-                ForeColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle
-            };
+            this.Close();
         }
 
-        private void BtnReg_Click(object sender, EventArgs e)
+        private void BtnClose_MouseEnter(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(txtUser.Text) || string.IsNullOrEmpty(txtPass.Text))
+            btnClose.BackColor = Color.FromArgb(232, 17, 35);
+            btnClose.ForeColor = Color.White;
+        }
+
+        private void BtnClose_MouseLeave(object sender, EventArgs e)
+        {
+            btnClose.BackColor = Color.Transparent;
+            btnClose.ForeColor = Color.FromArgb(160, 160, 160);
+        }
+
+        #endregion
+
+        #region Event Handlers - Register Button
+
+        private void BtnRegister_Click(object sender, EventArgs e)
+        {
+            // Validate required fields
+            if (string.IsNullOrWhiteSpace(txtUser.Text))
             {
-                MessageBox.Show("Vui lòng nhập các trường bắt buộc!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Vui lòng nhập tên đăng nhập!", "Thông báo", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtUser.Focus();
                 return;
             }
+
+            if (string.IsNullOrWhiteSpace(txtPass.Text))
+            {
+                MessageBox.Show("Vui lòng nhập mật khẩu!", "Thông báo", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtPass.Focus();
+                return;
+            }
+
             if (txtPass.Text != txtConfirm.Text)
             {
-                MessageBox.Show("Mật khẩu nhập lại không khớp!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Mật khẩu nhập lại không khớp!", "Lỗi", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtConfirm.Clear();
+                txtConfirm.Focus();
+                return;
+            }
+
+            if (txtPass.Text.Length < 6)
+            {
+                MessageBox.Show("Mật khẩu phải có ít nhất 6 ký tự!", "Lỗi", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtPass.Focus();
                 return;
             }
 
             try
             {
-                var user = DataManager.Instance.Register(txtUser.Text, txtPass.Text, txtName.Text, txtEmail.Text);
+                var user = DataManager.Instance.Register(
+                    txtUser.Text.Trim(), 
+                    txtPass.Text, 
+                    txtName.Text.Trim(), 
+                    txtEmail.Text.Trim()
+                );
+                
                 RegisteredUser = user;
+                MessageBox.Show("Đăng ký thành công!", "Thành công", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Lỗi Đăng Ký", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(ex.Message, "Lỗi Đăng Ký", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        // Drag Form Logic
+        private void BtnRegister_MouseEnter(object sender, EventArgs e)
+        {
+            btnRegister.BackColor = Color.FromArgb(0, 100, 180);
+        }
+
+        private void BtnRegister_MouseLeave(object sender, EventArgs e)
+        {
+            btnRegister.BackColor = Color.FromArgb(0, 120, 215);
+        }
+
+        #endregion
+
+        #region Event Handlers - Login Link
+
+        private void LblLogin_Click(object sender, EventArgs e)
+        {
+            this.DialogResult = DialogResult.Retry;
+            this.Close();
+        }
+
+        private void LblLogin_MouseEnter(object sender, EventArgs e)
+        {
+            lblLogin.ForeColor = Color.FromArgb(100, 160, 220);
+        }
+
+        private void LblLogin_MouseLeave(object sender, EventArgs e)
+        {
+            lblLogin.ForeColor = Color.FromArgb(140, 140, 140);
+        }
+
+        #endregion
+
+        #region Form Paint - Border
+
+        private void RegisterForm_Paint(object sender, PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            
+            // Vẽ border gradient
+            using (LinearGradientBrush brush = new LinearGradientBrush(
+                new Point(0, 0), 
+                new Point(this.Width, this.Height),
+                Color.FromArgb(0, 120, 215),
+                Color.FromArgb(100, 160, 220)))
+            using (Pen pen = new Pen(brush, 2))
+            {
+                e.Graphics.DrawRectangle(pen, 0, 0, this.Width - 1, this.Height - 1);
+            }
+        }
+
+        #endregion
+
+        #region Win32 API for Dragging
+
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         public static extern bool ReleaseCapture();
+
+        #endregion
     }
 }

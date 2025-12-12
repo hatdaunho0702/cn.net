@@ -1,88 +1,97 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using WindowsFormsApp1.Utils;
 
 namespace WindowsFormsApp1.Forms
 {
-    public class AddShelfDialog : Form
+    public partial class AddShelfDialog : Form
     {
-        private TextBox txtName;
-        private TextBox txtDescription;
-        private Button btnCreate;
-        private Button btnCancel;
-
         public string ShelfName => txtName.Text.Trim();
         public string ShelfDescription => txtDescription.Text.Trim();
 
         public AddShelfDialog()
         {
             InitializeComponent();
+            ApplyStyles();
         }
 
-        private void InitializeComponent()
+        private void ApplyStyles()
         {
-            this.Text = "Tạo Kệ Sách Mới";
-            this.Size = new Size(400, 250);
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.MinimizeBox = false;
+            // Bo g�c cho input containers
+            UIHelper.RoundPanel(pnlNameContainer, 8);
+            UIHelper.RoundPanel(pnlDescContainer, 8);
 
-            // Label Name
-            Label lblName = new Label();
-            lblName.Text = "Tên Kệ Sách:";
-            lblName.Location = new Point(20, 20);
-            lblName.AutoSize = true;
-            this.Controls.Add(lblName);
+            // Bo g�c cho buttons
+            UIHelper.RoundButton(btnCreate, 8);
+            UIHelper.RoundButton(btnCancel, 8);
 
-            // TextBox Name
-            txtName = new TextBox();
-            txtName.Location = new Point(20, 45);
-            txtName.Width = 340;
-            this.Controls.Add(txtName);
+            // Enable double buffering
+            this.DoubleBuffered = true;
 
-            // Label Description
-            Label lblDesc = new Label();
-            lblDesc.Text = "Mô Tả (Tùy chọn):";
-            lblDesc.Location = new Point(20, 80);
-            lblDesc.AutoSize = true;
-            this.Controls.Add(lblDesc);
-
-            // TextBox Description
-            txtDescription = new TextBox();
-            txtDescription.Location = new Point(20, 105);
-            txtDescription.Width = 340;
-            txtDescription.Height = 50;
-            txtDescription.Multiline = true;
-            this.Controls.Add(txtDescription);
-
-            // Button Create
-            btnCreate = new Button();
-            btnCreate.Text = "Tạo";
-            btnCreate.DialogResult = DialogResult.OK;
-            btnCreate.Location = new Point(200, 170);
-            btnCreate.Click += BtnCreate_Click;
-            this.Controls.Add(btnCreate);
-
-            // Button Cancel
-            btnCancel = new Button();
-            btnCancel.Text = "Hủy";
-            btnCancel.DialogResult = DialogResult.Cancel;
-            btnCancel.Location = new Point(285, 170);
-            this.Controls.Add(btnCancel);
-
-            this.AcceptButton = btnCreate;
-            this.CancelButton = btnCancel;
+            // Subscribe paint event
+            this.Paint += AddShelfDialog_Paint;
+            pnlHeader.MouseDown += PnlHeader_MouseDown;
         }
 
         private void BtnCreate_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtName.Text))
             {
-                MessageBox.Show("Vui lòng nhập tên kệ sách!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                this.DialogResult = DialogResult.None; // Prevent closing
+                MessageBox.Show("Vui l?ng nh?p t�n k? s�ch!", "Th�ng b�o", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtName.Focus();
+                return;
+            }
+
+            this.DialogResult = DialogResult.OK;
+            this.Close();
+        }
+
+        private void BtnCancel_Click(object sender, EventArgs e)
+        {
+            this.DialogResult = DialogResult.Cancel;
+            this.Close();
+        }
+
+        #region Form Paint - Border
+
+        private void AddShelfDialog_Paint(object sender, PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            
+            // V? border gradient
+            using (LinearGradientBrush brush = new LinearGradientBrush(
+                new Point(0, 0), 
+                new Point(this.Width, this.Height),
+                Color.FromArgb(0, 120, 215),
+                Color.FromArgb(100, 160, 220)))
+            using (Pen pen = new Pen(brush, 2))
+            {
+                e.Graphics.DrawRectangle(pen, 0, 0, this.Width - 1, this.Height - 1);
             }
         }
+
+        #endregion
+
+        #region Win32 API for Dragging
+
+        private void PnlHeader_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                ReleaseCapture();
+                SendMessage(Handle, 0xA1, 0x2, 0);
+            }
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern bool ReleaseCapture();
+
+        #endregion
     }
 }

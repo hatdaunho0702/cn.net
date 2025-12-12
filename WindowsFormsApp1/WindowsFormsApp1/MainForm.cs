@@ -24,50 +24,11 @@ namespace WindowsFormsApp1
         private readonly Color clrTextActive = Color.White;
         private readonly Color clrTextInactive = Color.FromArgb(154, 160, 166);
         private readonly Color clrHover = Color.FromArgb(60, 64, 67);
-        private readonly Color clrCardBg = Color.FromArgb(45, 45, 48); // Màu nền thẻ Note
-        #endregion
-
-        #region UI Components
-        // Layout Containers
-        private Panel sidebarPanel;
-        private Panel contentPanel;
-        private Panel topBar;
-        private FlowLayoutPanel booksPanel;
-
-        // Search & Filter
-        private Panel searchPanel;
-        private TextBox searchBox;
-        private Label searchIcon;
-        private Panel pnlFilterBar;
-        private ComboBox cmbFilterBook;
-        private System.Windows.Forms.Timer searchDebounceTimer;
-
-        // Sidebar Controls
-        private Button menuButton;
-        private Button btnShelfToggle;
-        private FlowLayoutPanel pnlShelfContainer;
-        private Dictionary<string, Button> sidebarButtons = new Dictionary<string, Button>();
-
-        // TopBar Controls
-        private ModernButton btnAddBook; // Nút mới gộp chức năng
-        private ModernButton sortButton;
-        private ModernButton btnReport; // Nút báo cáo sách
-        private Button userButton;
-        private Label lblUsername;
-        private Label logoLabel;
-
-        // Menus
-        private ContextMenuStrip authMenu;
-        private ContextMenuStrip importMenu;
-        private ContextMenuStrip sortMenu;   // Menu sắp xếp
-
-        // Footer / Status
-        private StatusStrip statusStrip;
-        private ToolStripStatusLabel lblStatusTotal;
-        private ToolStripStatusLabel lblStatusState;
+        private readonly Color clrCardBg = Color.FromArgb(45, 45, 48);
         #endregion
 
         #region State Variables
+        private Dictionary<string, Button> sidebarButtons = new Dictionary<string, Button>();
         private string currentView = "Books";
         private string currentSortBy = "Reading progress";
         private bool sortAscending = false;
@@ -79,255 +40,27 @@ namespace WindowsFormsApp1
 
         public MainForm()
         {
-            this.Text = "Koodo Reader";
-            this.Size = new Size(1280, 800);
-            this.MinimumSize = new Size(900, 600);
-            this.BackColor = clrBackground;
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.Icon = SystemIcons.Application;
-            this.DoubleBuffered = true;
+            InitializeComponent();
 
             string coverFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CoverImages");
             if (!Directory.Exists(coverFolder)) Directory.CreateDirectory(coverFolder);
 
-            InitializeUI();
+            // Setup user button region (round)
+            GraphicsPath gp = new GraphicsPath();
+            gp.AddEllipse(0, 0, 46, 46);
+            userButton.Region = new Region(gp);
 
-            searchDebounceTimer = new System.Windows.Forms.Timer { Interval = 300 };
-            searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
+            // Add sidebar buttons dynamically
+            SetupSidebarButtons();
 
             DataManager.Instance.SetCurrentUser(0);
             UpdateUIAuth();
         }
 
-        #region UI Initialization
+        #region Sidebar Setup
 
-        private void InitializeUI()
+        private void SetupSidebarButtons()
         {
-            SetupTopBar();
-            SetupSidebar();
-            SetupContentArea();
-            SetupStatusStrip();
-
-            this.Controls.Add(contentPanel);
-            this.Controls.Add(sidebarPanel);
-            this.Controls.Add(topBar);
-            this.Controls.Add(statusStrip);
-
-            if (sidebarButtons.ContainsKey("Books")) SetActiveButton(sidebarButtons["Books"]);
-        }
-
-        private void SetupTopBar()
-        {
-            topBar = new Panel { Dock = DockStyle.Top, Height = 70, BackColor = clrTopBar, Padding = new Padding(10) };
-
-            // 1. Menu Button
-            menuButton = CreateIconButton("☰", 15, 20, 40, 30);
-            menuButton.Click += (s, e) => ToggleSidebar();
-
-            // 2. Logo
-            logoLabel = new Label
-            {
-                Text = "koodo",
-                Font = new Font("Segoe UI", 18, FontStyle.Bold),
-                ForeColor = Color.White,
-                Location = new Point(60, 18),
-                AutoSize = true,
-                Cursor = Cursors.Hand
-            };
-
-            // 3. Search Bar
-            SetupSearchBar();
-
-            // 4. Action Buttons
-            int btnY = 15;
-
-            // [ĐƠN GIẢN HÓA] Nút Báo cáo - click trực tiếp
-            btnReport = CreateModernButton("🖨 Báo cáo", 110, Color.Teal);
-            btnReport.Location = new Point(550, btnY);
-            btnReport.Visible = false; // Ẩn khi chưa đăng nhập
-            btnReport.Click += (s, e) => BtnReportBooks_Click(); // Click trực tiếp vào báo cáo sách
-
-            // [CẬP NHẬT] Nút Sắp xếp với dropdown menu
-            sortButton = CreateModernButton("⇅ Sắp xếp", 110, Color.Transparent);
-            sortButton.ForeColor = clrTextActive;
-            sortButton.BorderColor = Color.FromArgb(80, 80, 80);
-            sortButton.BorderSize = 1;
-            sortButton.Location = new Point(670, btnY);
-            sortButton.Visible = false; // Ẩn khi chưa đăng nhập
-            
-            // Tạo menu dropdown cho sắp xếp
-            sortMenu = new ContextMenuStrip();
-            sortMenu.Renderer = new DarkMenuRenderer();
-            sortMenu.BackColor = clrTopBar;
-            sortMenu.ForeColor = Color.White;
-
-            var sortOptions = new[] {
-                ("📅  Ngày thêm", "Date"),
-                ("📖  Tên sách", "Book name"),
-                ("✍  Tác giả", "Author name"),
-                ("📊  Tiến độ đọc", "Reading progress")
-            };
-
-            foreach (var option in sortOptions)
-            {
-                var item = new ToolStripMenuItem(option.Item1);
-                item.Tag = option.Item2;
-                item.Click += SortMenuItem_Click;
-                sortMenu.Items.Add(item);
-            }
-
-            sortMenu.Items.Add(new ToolStripSeparator());
-
-            var itemAscending = new ToolStripMenuItem("⬆  Tăng dần");
-            itemAscending.Tag = "ASC";
-            itemAscending.Click += SortDirectionMenuItem_Click;
-            sortMenu.Items.Add(itemAscending);
-
-            var itemDescending = new ToolStripMenuItem("⬇  Giảm dần");
-            itemDescending.Tag = "DESC";
-            itemDescending.Click += SortDirectionMenuItem_Click;
-            sortMenu.Items.Add(itemDescending);
-
-            sortButton.Click += (s, e) => sortMenu.Show(sortButton, new Point(0, sortButton.Height));
-
-            // --- NÚT GỘP: THÊM SÁCH ---
-            btnAddBook = CreateModernButton("➕ Thêm sách", 120, Color.FromArgb(0, 90, 160));
-            btnAddBook.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnAddBook.Location = new Point(this.Width - 260, btnY);
-            btnAddBook.Visible = false; // Ẩn khi chưa login
-
-            // Tạo Menu con cho nút Thêm sách
-            importMenu = new ContextMenuStrip();
-            importMenu.Renderer = new DarkMenuRenderer();
-            importMenu.BackColor = clrTopBar;
-            importMenu.ForeColor = Color.White;
-
-            var itemImport = new ToolStripMenuItem("📄  Nhập file (Epub, PDF...)");
-            itemImport.Click += (s, e) => PerformImportFile();
-
-            var itemScan = new ToolStripMenuItem("📂  Quét thư mục");
-            itemScan.Click += (s, e) => PerformScanFolder();
-
-            importMenu.Items.Add(itemImport);
-            importMenu.Items.Add(itemScan);
-
-            btnAddBook.Click += (s, e) => importMenu.Show(btnAddBook, new Point(0, btnAddBook.Height));
-
-            // 5. User Profile
-            SetupUserProfile();
-
-
-            topBar.Controls.AddRange(new Control[] {
-                menuButton, logoLabel, searchPanel,
-                btnReport, sortButton, btnAddBook,
-                userButton, lblUsername
-            });
-        }
-
-        private void SetupSearchBar()
-        {
-            searchPanel = new Panel
-            {
-                Location = new Point(200, 15),
-                Size = new Size(320, 40),
-                BackColor = Color.FromArgb(50, 50, 55),
-                Cursor = Cursors.IBeam
-            };
-
-            searchPanel.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (GraphicsPath path = GetRoundedRectangle(new Rectangle(0, 0, searchPanel.Width - 1, searchPanel.Height - 1), 20))
-                using (Pen pen = new Pen(Color.FromArgb(70, 70, 70), 1))
-                {
-                    searchPanel.Region = new Region(path);
-                    e.Graphics.DrawPath(pen, path);
-                }
-            };
-            searchPanel.Click += (s, e) => searchBox.Focus();
-
-            searchIcon = new Label
-            {
-                Text = "🔍",
-                Font = new Font("Segoe UI Emoji", 12),
-                ForeColor = clrTextInactive,
-                Location = new Point(10, 8),
-                Size = new Size(30, 30),
-                TextAlign = ContentAlignment.MiddleCenter,
-                BackColor = Color.Transparent
-            };
-            searchIcon.Click += (s, e) => searchBox.Focus();
-
-            searchBox = new TextBox
-            {
-                Location = new Point(45, 10),
-                Size = new Size(260, 25),
-                BackColor = Color.FromArgb(50, 50, 55),
-                ForeColor = clrTextInactive,
-                Font = new Font("Segoe UI", 11),
-                BorderStyle = BorderStyle.None,
-                Text = "Tìm kiếm sách, tác giả..."
-            };
-
-            searchBox.GotFocus += (s, e) => { if (searchBox.Text == "Tìm kiếm sách, tác giả...") { searchBox.Text = ""; searchBox.ForeColor = Color.White; } };
-            searchBox.LostFocus += (s, e) => { if (string.IsNullOrWhiteSpace(searchBox.Text)) { searchBox.Text = "Tìm kiếm sách, tác giả..."; searchBox.ForeColor = clrTextInactive; } };
-
-            searchBox.TextChanged += (s, e) => {
-                searchDebounceTimer.Stop();
-                if (searchBox.Text != "Tìm kiếm sách, tác giả...") searchDebounceTimer.Start();
-            };
-
-            searchPanel.Controls.Add(searchIcon);
-            searchPanel.Controls.Add(searchBox);
-        }
-
-        private void SetupUserProfile()
-        {
-            userButton = new Button
-            {
-                Text = "👤",
-                Size = new Size(46, 46),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(60, 64, 67),
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI Emoji", 18),
-                Cursor = Cursors.Hand,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
-            };
-            userButton.FlatAppearance.BorderSize = 0;
-            GraphicsPath gp = new GraphicsPath();
-            gp.AddEllipse(0, 0, 46, 46);
-            userButton.Region = new Region(gp);
-            userButton.Click += UserButton_Click;
-
-            lblUsername = new Label
-            {
-                Text = "",
-                AutoSize = true,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Visible = false
-            };
-
-            authMenu = new ContextMenuStrip
-            {
-                BackColor = clrTopBar,
-                ForeColor = Color.White,
-                Renderer = new DarkMenuRenderer()
-            };
-        }
-
-        private void SetupSidebar()
-        {
-            sidebarPanel = new Panel
-            {
-                Dock = DockStyle.Left,
-                Width = 250,
-                BackColor = clrSidebar,
-                Padding = new Padding(0, 20, 0, 0)
-            };
-
             int yPos = 20;
             AddSidebarButton("Books", "📚 Sách", ref yPos);
             AddSidebarButton("Favorites", "❤️ Yêu thích", ref yPos);
@@ -335,98 +68,8 @@ namespace WindowsFormsApp1
             AddSidebarButton("Highlights", "⭐ Đánh dấu", ref yPos);
             AddSidebarButton("Trash", "🗑️ Thùng rác", ref yPos);
 
-            yPos += 20;
-
-            btnShelfToggle = new Button
-            {
-                Text = "📚  Kệ sách",
-                Tag = "Kệ sách",
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                ForeColor = clrTextInactive,
-                Location = new Point(10, yPos),
-                Size = new Size(230, 45),
-                TextAlign = ContentAlignment.MiddleLeft,
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.Transparent,
-                Cursor = Cursors.Hand,
-                Padding = new Padding(10, 0, 0, 0)
-            };
-            btnShelfToggle.FlatAppearance.BorderSize = 0;
-            btnShelfToggle.FlatAppearance.MouseOverBackColor = clrHover;
-            btnShelfToggle.Click += (s, e) => ToggleShelf();
-
-            pnlShelfContainer = new FlowLayoutPanel
-            {
-                Location = new Point(0, yPos + 50),
-                Size = new Size(250, 300),
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false,
-                AutoScroll = true,
-                Visible = true,
-                BackColor = Color.Transparent,
-                Padding = new Padding(20, 0, 0, 0)
-            };
-
-            sidebarPanel.Controls.Add(btnShelfToggle);
-            sidebarPanel.Controls.Add(pnlShelfContainer);
+            if (sidebarButtons.ContainsKey("Books")) SetActiveButton(sidebarButtons["Books"]);
         }
-
-        private void SetupContentArea()
-        {
-            contentPanel = new Panel { Dock = DockStyle.Fill, BackColor = clrBackground };
-
-            pnlFilterBar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = clrBackground, Visible = false };
-            var lbl = new Label { Text = "Lọc theo sách:", ForeColor = clrTextInactive, AutoSize = true, Anchor = AnchorStyles.Top | AnchorStyles.Right, Font = new Font("Segoe UI", 10, FontStyle.Bold), Location = new Point(20, 15) };
-
-            cmbFilterBook = new ComboBox
-            {
-                Size = new Size(200, 25),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(50, 50, 55),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Font = new Font("Segoe UI", 9),
-                Location = new Point(120, 12)
-            };
-            cmbFilterBook.SelectedIndexChanged += (s, e) => { if (currentView == "Highlights") LoadHighlightsView(); else if (currentView == "Notes") LoadNotesView(); };
-
-            Panel rightFilterPanel = new Panel { Dock = DockStyle.Right, Width = 350, BackColor = Color.Transparent };
-            rightFilterPanel.Controls.Add(lbl);
-            rightFilterPanel.Controls.Add(cmbFilterBook);
-            pnlFilterBar.Controls.Add(rightFilterPanel);
-
-            booksPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                AutoScroll = true,
-                BackColor = clrBackground,
-                Padding = new Padding(30)
-            };
-
-            contentPanel.Controls.Add(booksPanel);
-            contentPanel.Controls.Add(pnlFilterBar);
-        }
-
-        private void SetupStatusStrip()
-        {
-            statusStrip = new StatusStrip();
-            statusStrip.BackColor = clrSidebar;
-            statusStrip.ForeColor = clrTextInactive;
-            statusStrip.SizingGrip = false;
-
-            lblStatusState = new ToolStripStatusLabel("Sẵn sàng");
-            lblStatusTotal = new ToolStripStatusLabel("");
-            lblStatusTotal.Spring = true;
-            lblStatusTotal.TextAlign = ContentAlignment.MiddleRight;
-
-            statusStrip.Items.Add(lblStatusState);
-            statusStrip.Items.Add(lblStatusTotal);
-        }
-
-        #endregion
-
-        #region Logic & Event Handlers
 
         private void AddSidebarButton(string key, string text, ref int yPos)
         {
@@ -452,6 +95,91 @@ namespace WindowsFormsApp1
             yPos += 55;
         }
 
+        #endregion
+
+        #region Event Handlers - Designer Wired
+
+        private void MenuButton_Click(object sender, EventArgs e)
+        {
+            ToggleSidebar();
+        }
+
+        private void BtnShelfToggle_Click(object sender, EventArgs e)
+        {
+            ToggleShelf();
+        }
+
+        private void BtnAddBook_Click(object sender, EventArgs e)
+        {
+            importMenu.Show(btnAddBook, new Point(0, btnAddBook.Height));
+        }
+
+        private void SortButton_ClickShowMenu(object sender, EventArgs e)
+        {
+            sortMenu.Show(sortButton, new Point(0, sortButton.Height));
+        }
+
+        private void BtnReport_ClickHandler(object sender, EventArgs e)
+        {
+            BtnReportBooks_Click();
+        }
+
+        private void ItemImport_Click(object sender, EventArgs e)
+        {
+            PerformImportFile();
+        }
+
+        private void ItemScan_Click(object sender, EventArgs e)
+        {
+            PerformScanFolder();
+        }
+
+        private void SearchPanel_Paint(object sender, PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (GraphicsPath path = GetRoundedRectangle(new Rectangle(0, 0, searchPanel.Width - 1, searchPanel.Height - 1), 20))
+            using (Pen pen = new Pen(Color.FromArgb(70, 70, 70), 1))
+            {
+                searchPanel.Region = new Region(path);
+                e.Graphics.DrawPath(pen, path);
+            }
+        }
+
+        private void SearchPanel_Click(object sender, EventArgs e)
+        {
+            searchBox.Focus();
+        }
+
+        private void SearchIcon_Click(object sender, EventArgs e)
+        {
+            searchBox.Focus();
+        }
+
+        private void SearchBox_GotFocus(object sender, EventArgs e)
+        {
+            if (searchBox.Text == "Tìm kiếm sách, tác giả...")
+            {
+                searchBox.Text = "";
+                searchBox.ForeColor = Color.White;
+            }
+        }
+
+        private void SearchBox_LostFocus(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(searchBox.Text))
+            {
+                searchBox.Text = "Tìm kiếm sách, tác giả...";
+                searchBox.ForeColor = clrTextInactive;
+            }
+        }
+
+        private void SearchBox_TextChanged(object sender, EventArgs e)
+        {
+            searchDebounceTimer.Stop();
+            if (searchBox.Text != "Tìm kiếm sách, tác giả...")
+                searchDebounceTimer.Start();
+        }
+
         private void SearchDebounceTimer_Tick(object sender, EventArgs e)
         {
             searchDebounceTimer.Stop();
@@ -459,6 +187,16 @@ namespace WindowsFormsApp1
             else if (currentView == "Notes") LoadNotesView();
             else LoadBooks();
         }
+
+        private void CmbFilterBook_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (currentView == "Highlights") LoadHighlightsView();
+            else if (currentView == "Notes") LoadNotesView();
+        }
+
+        #endregion
+
+        #region Logic & Event Handlers
 
         private void SwitchView(string view)
         {
@@ -468,11 +206,10 @@ namespace WindowsFormsApp1
 
             bool isFilterView = view == "Highlights" || view == "Notes";
             pnlFilterBar.Visible = isFilterView;
-            
-            // [CẬP NHẬT] Chỉ hiện nút Sắp xếp và Báo cáo khi ở view Books hoặc các view liên quan đến sách
+
             bool isBookView = (view == "Books" || view == "Favorites" || view == "Trash" || view == "Shelf");
             sortButton.Visible = isBookView && _currentUser != null;
-            btnReport.Visible = (view == "Books") && _currentUser != null; // Chỉ hiện ở Books
+            btnReport.Visible = (view == "Books") && _currentUser != null;
 
             if (isFilterView) LoadFilterCombobox();
 
@@ -527,6 +264,37 @@ namespace WindowsFormsApp1
                 var bookCard = new BookCard { Book = book, Margin = new Padding(15) };
                 bookCard.BookClicked += (s, e) => OpenBook(book);
                 bookCard.MenuClicked += (s, e) => ShowBookMenu(book, bookCard);
+                
+                // Xử lý sự kiện cho sách trong thùng rác
+                bookCard.RestoreClicked += (s, e) => 
+                {
+                    DataManager.Instance.RestoreBook(book.Id);
+                    LoadBooks();
+                };
+                
+                bookCard.PermanentDeleteClicked += (s, e) => 
+                {
+                    var result = MessageBox.Show(
+                        $"Bạn có chắc chắn muốn xóa vĩnh viễn sách \"{book.Title}\"?\n\nHành động này không thể hoàn tác!",
+                        "Xác nhận xóa vĩnh viễn",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning
+                    );
+                    
+                    if (result == DialogResult.Yes)
+                    {
+                        try
+                        {
+                            DataManager.Instance.PermanentlyDeleteBook(book.Id);
+                            LoadBooks();
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Lỗi xóa sách: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                };
+                
                 booksPanel.Controls.Add(bookCard);
             }
             booksPanel.ResumeLayout();
@@ -587,7 +355,6 @@ namespace WindowsFormsApp1
             }
         }
 
-        // --- RESTORED: LOGIC HIỂN THỊ HIGHLIGHT/NOTE CÓ NÚT XÓA ---
         private void LoadHighlightsView()
         {
             booksPanel.Controls.Clear();
@@ -622,7 +389,6 @@ namespace WindowsFormsApp1
             foreach (var note in notes) { Panel card = CreateInfoCard(note, true); booksPanel.Controls.Add(card); }
         }
 
-        // [KHÔI PHỤC] Hàm tạo thẻ Note/Highlight có đầy đủ chức năng Xóa và Đi tới
         private Panel CreateInfoCard(Highlight item, bool isNote)
         {
             Panel card = new Panel
@@ -633,10 +399,8 @@ namespace WindowsFormsApp1
                 Cursor = Cursors.Hand
             };
 
-            // Thanh màu bên trái
             Panel colorBar = new Panel { Dock = DockStyle.Left, Width = 6, BackColor = ColorTranslator.FromHtml(item.ColorHex) };
 
-            // Tên sách
             Label lblBook = new Label
             {
                 Text = "📖 " + item.BookTitle,
@@ -646,7 +410,6 @@ namespace WindowsFormsApp1
                 AutoSize = true
             };
 
-            // Nội dung trích dẫn
             Label lblQuote = new Label
             {
                 Text = $"\"{item.SelectedText}\"",
@@ -657,7 +420,6 @@ namespace WindowsFormsApp1
                 AutoEllipsis = true
             };
 
-            // Nút "Đi tới" (Jump)
             Button btnJump = new Button
             {
                 Text = "Đi tới ➔",
@@ -682,7 +444,6 @@ namespace WindowsFormsApp1
                 }
             };
 
-            // Nút Xóa (Delete) - Đã khôi phục
             Button btnDelete = new Button
             {
                 Text = "🗑",
@@ -714,7 +475,6 @@ namespace WindowsFormsApp1
 
             card.Controls.AddRange(new Control[] { btnDelete, btnJump, lblQuote, lblBook, colorBar });
 
-            // Nếu là Note thì hiện thêm phần ghi chú của người dùng
             if (isNote)
             {
                 Label lblUserNote = new Label
@@ -730,7 +490,6 @@ namespace WindowsFormsApp1
             }
             else
             {
-                // Click vào card thì nhảy tới trang
                 card.Click += (s, e) => btnJump.PerformClick();
                 lblQuote.Click += (s, e) => btnJump.PerformClick();
             }
@@ -738,10 +497,44 @@ namespace WindowsFormsApp1
             return card;
         }
 
-        private void LoadFilterCombobox() { if (_currentUser == null) return; List<Book> books = (currentView == "Highlights") ? DataManager.Instance.GetBooksWithHighlights() : (currentView == "Notes" ? DataManager.Instance.GetBooksWithNotes() : DataManager.Instance.GetAllBooks()); var defaultOption = new Book { Id = -1, Title = "Tất cả sách" }; books.Insert(0, defaultOption); cmbFilterBook.DataSource = books; cmbFilterBook.DisplayMember = "Title"; cmbFilterBook.ValueMember = "Id"; }
-        private void ApplySort(ref List<Book> books) { switch (currentSortBy) { case "Vừa đọc": case "Recently read": case "Ngày thêm": case "Date": books = sortAscending ? books.OrderBy(b => b.DateAdded).ToList() : books.OrderByDescending(b => b.DateAdded).ToList(); break; case "Tên sách": case "Book name": books = sortAscending ? books.OrderBy(b => b.Title).ToList() : books.OrderByDescending(b => b.Title).ToList(); break; case "Tác giả": case "Author name": books = sortAscending ? books.OrderBy(b => b.Author).ToList() : books.OrderByDescending(b => b.Author).ToList(); break; case "Tiến độ đọc": case "Reading progress": books = sortAscending ? books.OrderBy(b => b.Progress).ToList() : books.OrderByDescending(b => b.Progress).ToList(); break; default: books = books.OrderByDescending(b => b.DateAdded).ToList(); break; } }
+        private void LoadFilterCombobox()
+        {
+            if (_currentUser == null) return;
+            List<Book> books = (currentView == "Highlights") ? DataManager.Instance.GetBooksWithHighlights() : (currentView == "Notes" ? DataManager.Instance.GetBooksWithNotes() : DataManager.Instance.GetAllBooks());
+            var defaultOption = new Book { Id = -1, Title = "Tất cả sách" };
+            books.Insert(0, defaultOption);
+            cmbFilterBook.DataSource = books;
+            cmbFilterBook.DisplayMember = "Title";
+            cmbFilterBook.ValueMember = "Id";
+        }
 
-        // --- CÁC HÀM XỬ LÝ NHẬP LIỆU ---
+        private void ApplySort(ref List<Book> books)
+        {
+            switch (currentSortBy)
+            {
+                case "Vừa đọc":
+                case "Recently read":
+                case "Ngày thêm":
+                case "Date":
+                    books = sortAscending ? books.OrderBy(b => b.DateAdded).ToList() : books.OrderByDescending(b => b.DateAdded).ToList();
+                    break;
+                case "Tên sách":
+                case "Book name":
+                    books = sortAscending ? books.OrderBy(b => b.Title).ToList() : books.OrderByDescending(b => b.Title).ToList();
+                    break;
+                case "Tác giả":
+                case "Author name":
+                    books = sortAscending ? books.OrderBy(b => b.Author).ToList() : books.OrderByDescending(b => b.Author).ToList();
+                    break;
+                case "Tiến độ đọc":
+                case "Reading progress":
+                    books = sortAscending ? books.OrderBy(b => b.Progress).ToList() : books.OrderByDescending(b => b.Progress).ToList();
+                    break;
+                default:
+                    books = books.OrderByDescending(b => b.DateAdded).ToList();
+                    break;
+            }
+        }
 
         private async void PerformScanFolder()
         {
@@ -794,13 +587,21 @@ namespace WindowsFormsApp1
             }
         }
 
-        // --- BUTTON EVENTS ---
-
-        private void BtnReport_Click(object sender, EventArgs e)
+        private void BtnReportBooks_Click()
         {
-            if (_currentUser == null) { MessageBox.Show("Vui lòng đăng nhập!", "Yêu cầu", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (_currentUser == null)
+            {
+                MessageBox.Show("Vui lòng đăng nhập!", "Yêu cầu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             var books = DataManager.Instance.GetAllBooks();
-            if (books.Count == 0) { MessageBox.Show("Không có dữ liệu để báo cáo.", "Thông báo"); return; }
+            if (books.Count == 0)
+            {
+                MessageBox.Show("Không có dữ liệu để báo cáo.", "Thông báo");
+                return;
+            }
+
             var reportService = new WindowsFormsApp1.Services.ReportService();
             reportService.CreateBookListReport(books, _currentUser.DisplayName);
         }
@@ -810,7 +611,7 @@ namespace WindowsFormsApp1
             isSidebarExpanded = !isSidebarExpanded;
             sidebarPanel.Width = isSidebarExpanded ? 250 : 70;
             foreach (var btn in sidebarButtons.Values) UpdateButtonText(btn, isSidebarExpanded);
-            btnShelfToggle.Text = isSidebarExpanded ? " " + btnShelfToggle.Tag.ToString() : "📚";
+            btnShelfToggle.Text = isSidebarExpanded ? "📚  " + btnShelfToggle.Tag.ToString() : "📚";
             pnlShelfContainer.Visible = isSidebarExpanded && isShelfExpanded;
             logoLabel.Visible = isSidebarExpanded;
         }
@@ -831,13 +632,13 @@ namespace WindowsFormsApp1
 
         private void UpdateUIAuth()
         {
-            int rightMargin = 20; int gap = 15;
+            int rightMargin = 20;
+            int gap = 15;
             userButton.Location = new Point(topBar.Width - userButton.Width - rightMargin, 12);
             userButton.Visible = true;
 
             if (_currentUser == null)
             {
-                // [CẬP NHẬT] Ẩn các nút khi chưa đăng nhập
                 btnAddBook.Visible = false;
                 btnReport.Visible = false;
                 sortButton.Visible = false;
@@ -854,14 +655,11 @@ namespace WindowsFormsApp1
                 lblUsername.Visible = true;
                 lblUsername.Location = new Point(userButton.Left - lblUsername.Width - gap, 25);
 
-                // [CẬP NHẬT] Hiện các nút khi đã đăng nhập
                 btnAddBook.Visible = true;
-                // btnReport và sortButton sẽ được điều khiển bởi SwitchView()
-                // Chỉ hiện sortButton nếu đang ở view sách
                 bool isBookView = (currentView == "Books" || currentView == "Favorites" || currentView == "Trash" || currentView == "Shelf");
                 sortButton.Visible = isBookView;
-                btnReport.Visible = (currentView == "Books"); // Chỉ hiện ở Books
-                
+                btnReport.Visible = (currentView == "Books");
+
                 btnAddBook.Location = new Point(lblUsername.Left - btnAddBook.Width - gap, 15);
                 sortButton.Location = new Point(btnAddBook.Left - sortButton.Width - gap, 15);
                 btnReport.Location = new Point(sortButton.Left - btnReport.Width - gap, 15);
@@ -869,7 +667,6 @@ namespace WindowsFormsApp1
             RefreshSidebarShelves();
         }
 
-        // [MỚI] Xử lý sự kiện click vào menu sắp xếp
         private void SortMenuItem_Click(object sender, EventArgs e)
         {
             if (sender is ToolStripMenuItem item && item.Tag != null)
@@ -888,50 +685,143 @@ namespace WindowsFormsApp1
             }
         }
 
-        // [MỚI] Báo cáo sách
-        private void BtnReportBooks_Click()
+        private void ShowLoginForm()
         {
-            if (_currentUser == null) 
-            { 
-                MessageBox.Show("Vui lòng đăng nhập!", "Yêu cầu", MessageBoxButtons.OK, MessageBoxIcon.Warning); 
-                return; 
+            var form = new LoginForm();
+            if (form.ShowDialog() == DialogResult.OK)
+            {
+                _currentUser = form.LoggedInUser;
+                UpdateUIAuth();
+                LoadBooks();
             }
-            
-            var books = DataManager.Instance.GetAllBooks();
-            if (books.Count == 0) 
-            { 
-                MessageBox.Show("Không có dữ liệu để báo cáo.", "Thông báo"); 
-                return; 
-            }
-            
-            var reportService = new WindowsFormsApp1.Services.ReportService();
-            reportService.CreateBookListReport(books, _currentUser.DisplayName);
         }
 
-        private void ShowLoginForm() { var form = new LoginForm(); if (form.ShowDialog() == DialogResult.OK) { _currentUser = form.LoggedInUser; UpdateUIAuth(); LoadBooks(); } }
-        private void ShowRegisterForm() { var form = new RegisterForm(); if (form.ShowDialog() == DialogResult.OK) { _currentUser = form.RegisteredUser; UpdateUIAuth(); LoadBooks(); } }
-        private void OpenBook(Book book) { if (!File.Exists(book.FilePath)) { MessageBox.Show("File không tồn tại"); return; } var form = new BookReaderForm(book); form.ShowDialog(); LoadBooks(); }
+        private void ShowRegisterForm()
+        {
+            var form = new RegisterForm();
+            if (form.ShowDialog() == DialogResult.OK)
+            {
+                _currentUser = form.RegisteredUser;
+                UpdateUIAuth();
+                LoadBooks();
+            }
+        }
+
+        private void OpenBook(Book book)
+        {
+            if (!File.Exists(book.FilePath))
+            {
+                MessageBox.Show("File không tồn tại");
+                return;
+            }
+            var form = new BookReaderForm(book);
+            form.ShowDialog();
+            LoadBooks();
+        }
 
         private void ShowBookMenu(Book book, BookCard card)
         {
             ContextMenuStrip menu = new ContextMenuStrip { BackColor = clrTopBar, ForeColor = Color.White, Renderer = new DarkMenuRenderer() };
             if (!book.IsDeleted)
             {
-                var editItem = new ToolStripMenuItem("✎  Sửa thông tin"); editItem.Click += (s, e) => { using (var editForm = new EditBookForm(book)) { if (editForm.ShowDialog() == DialogResult.OK) LoadBooks(); } }; menu.Items.Add(editItem);
+                var editItem = new ToolStripMenuItem("✎  Sửa thông tin");
+                editItem.Click += (s, e) => { using (var editForm = new EditBookForm(book)) { if (editForm.ShowDialog() == DialogResult.OK) LoadBooks(); } };
+                menu.Items.Add(editItem);
                 menu.Items.Add(new ToolStripSeparator());
-                var openItem = new ToolStripMenuItem("📁  Mở thư mục"); openItem.Click += (s, e) => System.Diagnostics.Process.Start("explorer.exe", $"/select, \"{book.FilePath}\""); menu.Items.Add(openItem);
-                var delItem = new ToolStripMenuItem("🗑️  Xóa"); delItem.Click += (s, e) => { DataManager.Instance.DeleteBook(book.Id); LoadBooks(); }; menu.Items.Add(delItem);
+                var openItem = new ToolStripMenuItem("📁  Mở thư mục");
+                openItem.Click += (s, e) => System.Diagnostics.Process.Start("explorer.exe", $"/select, \"{book.FilePath}\"");
+                menu.Items.Add(openItem);
+                
+                // Thêm vào kệ sách
+                var addToShelfItem = new ToolStripMenuItem("📚  Thêm vào kệ");
+                addToShelfItem.Click += (s, e) => 
+                {
+                    using (var dlg = new AddToShelfDialog())
+                    {
+                        if (dlg.ShowDialog() == DialogResult.OK)
+                        {
+                            int shelfId = dlg.SelectedShelfId;
+                            
+                            // Nếu tạo kệ mới
+                            if (!string.IsNullOrEmpty(dlg.NewShelfName))
+                            {
+                                shelfId = DataManager.Instance.AddShelf(dlg.NewShelfName);
+                            }
+                            
+                            // Thêm sách vào kệ
+                            if (shelfId > 0)
+                            {
+                                DataManager.Instance.AddBookToShelf(book.Id, shelfId);
+                                MessageBox.Show("Đã thêm sách vào kệ!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
+                        }
+                    }
+                };
+                menu.Items.Add(addToShelfItem);
+                
+                menu.Items.Add(new ToolStripSeparator());
+                var delItem = new ToolStripMenuItem("🗑️  Xóa");
+                delItem.Click += (s, e) => { DataManager.Instance.DeleteBook(book.Id); LoadBooks(); };
+                menu.Items.Add(delItem);
             }
             else
             {
-                var restore = new ToolStripMenuItem("♻️  Khôi phục"); restore.Click += (s, e) => { DataManager.Instance.RestoreBook(book.Id); LoadBooks(); }; menu.Items.Add(restore);
+                var restore = new ToolStripMenuItem("♻️  Khôi phục");
+                restore.Click += (s, e) => { DataManager.Instance.RestoreBook(book.Id); LoadBooks(); };
+                menu.Items.Add(restore);
+                
+                menu.Items.Add(new ToolStripSeparator());
+                
+                // Xóa vĩnh viễn
+                var permanentDelete = new ToolStripMenuItem("❌  Xóa vĩnh viễn");
+                permanentDelete.Click += (s, e) => 
+                {
+                    var result = MessageBox.Show(
+                        $"Bạn có chắc chắn muốn xóa vĩnh viễn sách \"{book.Title}\"?\n\nHành động này không thể hoàn tác!",
+                        "Xác nhận xóa vĩnh viễn",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning
+                    );
+                    
+                    if (result == DialogResult.Yes)
+                    {
+                        try
+                        {
+                            DataManager.Instance.PermanentlyDeleteBook(book.Id);
+                            LoadBooks();
+                            MessageBox.Show("Đã xóa sách vĩnh viễn!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Lỗi xóa sách: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                };
+                menu.Items.Add(permanentDelete);
             }
             menu.Show(card, new Point(0, card.Height));
         }
 
-        private void BtnAddShelf_Click(object sender, EventArgs e) { if (_currentUser == null) return; using (var dlg = new AddShelfDialog()) if (dlg.ShowDialog() == DialogResult.OK) { DataManager.Instance.AddShelf(dlg.ShelfName, dlg.ShelfDescription); RefreshSidebarShelves(); } }
-        private void BtnManageShelf_Click(object sender, EventArgs e) { if (_currentUser == null) return; using (var dlg = new ManageShelfDialog()) { dlg.ShowDialog(); RefreshSidebarShelves(); } }
-        private void SortButton_Click(object sender, EventArgs e) { /* Sort logic */ }
+        private void BtnAddShelf_Click(object sender, EventArgs e)
+        {
+            if (_currentUser == null) return;
+            using (var dlg = new AddShelfDialog())
+                if (dlg.ShowDialog() == DialogResult.OK)
+                {
+                    DataManager.Instance.AddShelf(dlg.ShelfName, dlg.ShelfDescription);
+                    RefreshSidebarShelves();
+                }
+        }
+
+        private void BtnManageShelf_Click(object sender, EventArgs e)
+        {
+            if (_currentUser == null) return;
+            using (var dlg = new ManageShelfDialog())
+            {
+                dlg.ShowDialog();
+                RefreshSidebarShelves();
+            }
+        }
 
         private void UserButton_Click(object sender, EventArgs e)
         {
@@ -944,40 +834,35 @@ namespace WindowsFormsApp1
             else
             {
                 var editProfile = new ToolStripMenuItem($"👤  {_currentUser.DisplayName} (Sửa)");
-                editProfile.Click += (s, ev) => { using (var pwd = new PasswordPromptForm()) { if (pwd.ShowDialog() == DialogResult.OK && pwd.IsVerified) { using (var edit = new EditProfileForm(_currentUser)) { if (edit.ShowDialog() == DialogResult.OK && edit.UpdatedUser != null) { _currentUser = edit.UpdatedUser; UpdateUIAuth(); } } } } };
+                editProfile.Click += (s, ev) =>
+                {
+                    using (var pwd = new PasswordPromptForm())
+                    {
+                        if (pwd.ShowDialog() == DialogResult.OK && pwd.IsVerified)
+                        {
+                            using (var edit = new EditProfileForm(_currentUser))
+                            {
+                                if (edit.ShowDialog() == DialogResult.OK && edit.UpdatedUser != null)
+                                {
+                                    _currentUser = edit.UpdatedUser;
+                                    UpdateUIAuth();
+                                }
+                            }
+                        }
+                    }
+                };
                 authMenu.Items.Add(editProfile);
                 authMenu.Items.Add(new ToolStripSeparator());
-                authMenu.Items.Add("🚪  Đăng Xuất", null, (s, ev) => { _currentUser = null; DataManager.Instance.SetCurrentUser(0); booksPanel.Controls.Clear(); UpdateUIAuth(); });
+                authMenu.Items.Add("🚪  Đăng Xuất", null, (s, ev) =>
+                {
+                    _currentUser = null;
+                    DataManager.Instance.SetCurrentUser(0);
+                    booksPanel.Controls.Clear();
+                    UpdateUIAuth();
+                });
             }
             authMenu.Show(userButton, new Point(0, userButton.Height));
         }
-
-        private ModernButton CreateModernButton(string text, int width, Color backColor)
-        {
-            return new ModernButton
-            {
-                Text = text,
-                Size = new Size(width, 40),
-                BackColor = backColor,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                BorderRadius = 20,
-                HoverColor = ControlPaint.Light(backColor)
-            };
-        }
-
-        private Button CreateIconButton(string text, int x, int y, int width, int height) => new Button
-        {
-            Text = text,
-            Location = new Point(x, y),
-            Size = new Size(width, height),
-            BackColor = Color.Transparent,
-            ForeColor = clrTextInactive,
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 14),
-            Cursor = Cursors.Hand,
-            FlatAppearance = { BorderSize = 0 }
-        };
 
         private Button CreateSidebarSubButton(string text)
         {
@@ -1019,14 +904,12 @@ namespace WindowsFormsApp1
 
         private void UpdateButtonText(Button btn, bool show)
         {
-            // Placeholder implementation - can be enhanced based on requirements
             if (!show && btn.Tag != null)
             {
                 string fullText = btn.Tag.ToString();
-                // Extract emoji only if text contains emoji
                 if (fullText.Contains(" "))
                 {
-                    btn.Text = fullText.Split(' ')[0]; // Get emoji part
+                    btn.Text = fullText.Split(' ')[0];
                 }
             }
             else if (btn.Tag != null)
@@ -1080,7 +963,14 @@ namespace WindowsFormsApp1
             else
             {
                 this.Region = new Region(rectSurface);
-                if (BorderSize >= 1) { using (Pen penBorder = new Pen(BorderColor, BorderSize)) { penBorder.Alignment = PenAlignment.Inset; pevent.Graphics.DrawRectangle(penBorder, 0, 0, this.Width - 1, this.Height - 1); } }
+                if (BorderSize >= 1)
+                {
+                    using (Pen penBorder = new Pen(BorderColor, BorderSize))
+                    {
+                        penBorder.Alignment = PenAlignment.Inset;
+                        pevent.Graphics.DrawRectangle(penBorder, 0, 0, this.Width - 1, this.Height - 1);
+                    }
+                }
             }
         }
 
@@ -1096,11 +986,25 @@ namespace WindowsFormsApp1
             return path;
         }
 
-        protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); originalBackColor = this.BackColor; this.BackColor = HoverColor; }
-        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); this.BackColor = originalBackColor; }
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            originalBackColor = this.BackColor;
+            this.BackColor = HoverColor;
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            this.BackColor = originalBackColor;
+        }
     }
 
-    public class DarkMenuRenderer : ToolStripProfessionalRenderer { public DarkMenuRenderer() : base(new DarkMenuColors()) { } }
+    public class DarkMenuRenderer : ToolStripProfessionalRenderer
+    {
+        public DarkMenuRenderer() : base(new DarkMenuColors()) { }
+    }
+
     public class DarkMenuColors : ProfessionalColorTable
     {
         public override Color MenuItemSelected => Color.FromArgb(60, 60, 63);

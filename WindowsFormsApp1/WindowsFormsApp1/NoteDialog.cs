@@ -1,61 +1,101 @@
 ﻿using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using WindowsFormsApp1.Utils;
 
-namespace WindowsFormsApp1.Forms // Chú ý namespace phải khớp với folder
+namespace WindowsFormsApp1.Forms
 {
     public partial class NoteDialog : Form
     {
         public string NoteText { get; private set; }
-        private TextBox txtNote;
 
         public NoteDialog()
         {
-            // Thiết lập giao diện cửa sổ nhập Note
-            this.Text = "Thêm Ghi Chú";
-            this.Size = new Size(350, 220);
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.BackColor = Color.FromArgb(45, 45, 48);
-            this.ForeColor = Color.White;
-            this.FormBorderStyle = FormBorderStyle.FixedToolWindow;
-
-            Label lbl = new Label { Text = "Nhập suy nghĩ của bạn:", Location = new Point(15, 15), AutoSize = true, Font = new Font("Segoe UI", 10) };
-
-            txtNote = new TextBox
-            {
-                Location = new Point(15, 45),
-                Size = new Size(300, 80),
-                Multiline = true,
-                BackColor = Color.FromArgb(60, 60, 63),
-                ForeColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle,
-                Font = new Font("Segoe UI", 10)
-            };
-
-            Button btnSave = new Button
-            {
-                Text = "Lưu Note",
-                Location = new Point(215, 140),
-                Size = new Size(100, 30),
-                BackColor = Color.FromArgb(0, 120, 215),
-                FlatStyle = FlatStyle.Flat,
-                DialogResult = DialogResult.OK,
-                Cursor = Cursors.Hand
-            };
-            btnSave.Click += (s, e) => { NoteText = txtNote.Text; this.Close(); };
-
-            Button btnCancel = new Button
-            {
-                Text = "Hủy",
-                Location = new Point(105, 140),
-                Size = new Size(100, 30),
-                BackColor = Color.Gray,
-                FlatStyle = FlatStyle.Flat,
-                DialogResult = DialogResult.Cancel,
-                Cursor = Cursors.Hand
-            };
-
-            this.Controls.AddRange(new Control[] { lbl, txtNote, btnSave, btnCancel });
+            InitializeComponent();
+            ApplyStyles();
         }
+
+        public NoteDialog(string existingNote) : this()
+        {
+            txtNote.Text = existingNote;
+        }
+
+        private void ApplyStyles()
+        {
+            // Bo góc cho input container
+            UIHelper.RoundPanel(pnlNoteContainer, 8);
+
+            // Bo góc cho buttons
+            UIHelper.RoundButton(btnSave, 8);
+            UIHelper.RoundButton(btnCancel, 8);
+
+            // Enable double buffering
+            this.DoubleBuffered = true;
+
+            // Subscribe paint event
+            this.Paint += NoteDialog_Paint;
+            pnlHeader.MouseDown += PnlHeader_MouseDown;
+        }
+
+        private void BtnSave_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtNote.Text))
+            {
+                MessageBox.Show("Vui lòng nhập nội dung ghi chú!", "Thông báo", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtNote.Focus();
+                return;
+            }
+
+            NoteText = txtNote.Text.Trim();
+            this.DialogResult = DialogResult.OK;
+            this.Close();
+        }
+
+        private void BtnCancel_Click(object sender, EventArgs e)
+        {
+            this.DialogResult = DialogResult.Cancel;
+            this.Close();
+        }
+
+        #region Form Paint - Border
+
+        private void NoteDialog_Paint(object sender, PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            
+            // Vẽ border gradient
+            using (LinearGradientBrush brush = new LinearGradientBrush(
+                new Point(0, 0), 
+                new Point(this.Width, this.Height),
+                Color.FromArgb(0, 120, 215),
+                Color.FromArgb(100, 160, 220)))
+            using (Pen pen = new Pen(brush, 2))
+            {
+                e.Graphics.DrawRectangle(pen, 0, 0, this.Width - 1, this.Height - 1);
+            }
+        }
+
+        #endregion
+
+        #region Win32 API for Dragging
+
+        private void PnlHeader_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                ReleaseCapture();
+                SendMessage(Handle, 0xA1, 0x2, 0);
+            }
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern bool ReleaseCapture();
+
+        #endregion
     }
 }

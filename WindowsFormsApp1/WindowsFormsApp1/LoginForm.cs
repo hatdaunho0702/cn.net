@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using WindowsFormsApp1.Data;
-using WindowsFormsApp1.Models; // Thêm using
+using WindowsFormsApp1.Models;
+using WindowsFormsApp1.Utils;
 
 namespace WindowsFormsApp1.Forms
 {
@@ -10,129 +12,92 @@ namespace WindowsFormsApp1.Forms
     {
         public User LoggedInUser { get; private set; }
 
-        private TextBox txtUser;
-        private TextBox txtPass;
-
         public LoginForm()
         {
-            InitializeCustomUI();
+            InitializeComponent();
+            ApplyStyles();
         }
 
-        private void InitializeCustomUI()
+        private void ApplyStyles()
         {
-            // --- Form Settings ---
-            this.Text = "Koodo Reader - Đăng Nhập";
-            this.Size = new Size(400, 450);
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.BackColor = Color.FromArgb(32, 32, 32); // Darker background
-            this.ForeColor = Color.White;
-            this.FormBorderStyle = FormBorderStyle.None; // Modern borderless look
-            this.Padding = new Padding(2); // Border thickness
+            // Bo góc cho các input containers
+            UIHelper.RoundPanel(pnlUserContainer, 8);
+            UIHelper.RoundPanel(pnlPassContainer, 8);
 
-            // --- Custom Title Bar (Optional, for dragging) ---
-            Panel titleBar = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = Color.Transparent };
-            titleBar.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(Handle, 0xA1, 0x2, 0); } };
-            
-            Button btnClose = new Button
-            {
-                Text = "✕",
-                Dock = DockStyle.Right,
-                Width = 40,
-                FlatStyle = FlatStyle.Flat,
-                ForeColor = Color.Gray,
-                BackColor = Color.Transparent
-            };
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.Click += (s, e) => this.Close();
-            btnClose.MouseEnter += (s, e) => { btnClose.BackColor = Color.Red; btnClose.ForeColor = Color.White; };
-            btnClose.MouseLeave += (s, e) => { btnClose.BackColor = Color.Transparent; btnClose.ForeColor = Color.Gray; };
-            titleBar.Controls.Add(btnClose);
-            this.Controls.Add(titleBar);
+            // Bo góc cho button login
+            UIHelper.RoundButton(btnLogin, 8);
 
-            // --- Main Content Panel ---
-            Panel mainPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(40) };
-            
-            // Logo / Icon
-            Label lblIcon = new Label
-            {
-                Text = "👤",
-                Font = new Font("Segoe UI", 40),
-                AutoSize = true,
-                ForeColor = Color.FromArgb(0, 120, 215),
-                Location = new Point(160, 20) // Centered roughly
-            };
-            
-            // Title
-            Label lblTitle = new Label
-            {
-                Text = "Welcome Back",
-                Font = new Font("Segoe UI", 18, FontStyle.Bold),
-                ForeColor = Color.White,
-                AutoSize = true,
-                Location = new Point(110, 90)
-            };
-
-            // Username
-            Label lblUser = new Label { Text = "USERNAME OR EMAIL", Font = new Font("Segoe UI", 8, FontStyle.Bold), ForeColor = Color.Gray, Location = new Point(40, 150), AutoSize = true };
-            txtUser = CreateStyledTextBox(40, 175);
-            
-            // Password
-            Label lblPass = new Label { Text = "PASSWORD", Font = new Font("Segoe UI", 8, FontStyle.Bold), ForeColor = Color.Gray, Location = new Point(40, 220), AutoSize = true };
-            txtPass = CreateStyledTextBox(40, 245);
-            txtPass.PasswordChar = '•';
-
-            // Login Button
-            Button btnLogin = new Button
-            {
-                Text = "LOGIN",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Location = new Point(40, 310),
-                Size = new Size(320, 45),
-                BackColor = Color.FromArgb(0, 120, 215),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
-            };
-            btnLogin.FlatAppearance.BorderSize = 0;
-            btnLogin.Click += BtnLogin_Click;
-
-            // Register Link
-            Label lblRegister = new Label
-            {
-                Text = "Don't have an account? Register",
-                Font = new Font("Segoe UI", 9, FontStyle.Underline),
-                ForeColor = Color.Gray,
-                AutoSize = true,
-                Cursor = Cursors.Hand,
-                Location = new Point(105, 370)
-            };
-            lblRegister.Click += (s, e) => { this.DialogResult = DialogResult.Retry; this.Close(); }; // Retry indicates switch to register
-            lblRegister.MouseEnter += (s, e) => lblRegister.ForeColor = Color.White;
-            lblRegister.MouseLeave += (s, e) => lblRegister.ForeColor = Color.Gray;
-
-            mainPanel.Controls.AddRange(new Control[] { lblIcon, lblTitle, lblUser, txtUser, lblPass, txtPass, btnLogin, lblRegister });
-            this.Controls.Add(mainPanel);
-
-            // Paint Border
-            this.Paint += (s, e) => { ControlPaint.DrawBorder(e.Graphics, this.ClientRectangle, Color.FromArgb(60, 60, 60), ButtonBorderStyle.Solid); };
+            // Enable double buffering
+            this.DoubleBuffered = true;
         }
 
-        private TextBox CreateStyledTextBox(int x, int y)
+        #region Event Handlers - Title Bar
+
+        private void TitleBar_MouseDown(object sender, MouseEventArgs e)
         {
-            return new TextBox
+            if (e.Button == MouseButtons.Left)
             {
-                Location = new Point(x, y),
-                Size = new Size(320, 30),
-                Font = new Font("Segoe UI", 11),
-                BackColor = Color.FromArgb(45, 45, 48),
-                ForeColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle
-            };
+                ReleaseCapture();
+                SendMessage(Handle, 0xA1, 0x2, 0);
+            }
         }
+
+        private void BtnClose_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+
+        private void BtnClose_MouseEnter(object sender, EventArgs e)
+        {
+            btnClose.BackColor = Color.FromArgb(232, 17, 35);
+            btnClose.ForeColor = Color.White;
+        }
+
+        private void BtnClose_MouseLeave(object sender, EventArgs e)
+        {
+            btnClose.BackColor = Color.Transparent;
+            btnClose.ForeColor = Color.FromArgb(160, 160, 160);
+        }
+
+        #endregion
+
+        #region Event Handlers - TextBox Focus Effects
+
+        private void TxtUser_Enter(object sender, EventArgs e)
+        {
+            pnlUserContainer.BackColor = Color.FromArgb(55, 55, 60);
+            pnlUserIcon.BackColor = Color.FromArgb(55, 55, 60);
+            txtUser.BackColor = Color.FromArgb(55, 55, 60);
+        }
+
+        private void TxtUser_Leave(object sender, EventArgs e)
+        {
+            pnlUserContainer.BackColor = Color.FromArgb(45, 45, 50);
+            pnlUserIcon.BackColor = Color.FromArgb(45, 45, 50);
+            txtUser.BackColor = Color.FromArgb(45, 45, 50);
+        }
+
+        private void TxtPass_Enter(object sender, EventArgs e)
+        {
+            pnlPassContainer.BackColor = Color.FromArgb(55, 55, 60);
+            pnlPassIcon.BackColor = Color.FromArgb(55, 55, 60);
+            txtPass.BackColor = Color.FromArgb(55, 55, 60);
+        }
+
+        private void TxtPass_Leave(object sender, EventArgs e)
+        {
+            pnlPassContainer.BackColor = Color.FromArgb(45, 45, 50);
+            pnlPassIcon.BackColor = Color.FromArgb(45, 45, 50);
+            txtPass.BackColor = Color.FromArgb(45, 45, 50);
+        }
+
+        #endregion
+
+        #region Event Handlers - Buttons & Links
 
         private void BtnLogin_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(txtUser.Text) || string.IsNullOrEmpty(txtPass.Text))
+            if (string.IsNullOrWhiteSpace(txtUser.Text) || string.IsNullOrWhiteSpace(txtPass.Text))
             {
                 MessageBox.Show("Vui lòng nhập đầy đủ thông tin!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -148,13 +113,82 @@ namespace WindowsFormsApp1.Forms
             else
             {
                 MessageBox.Show("Sai tên đăng nhập hoặc mật khẩu!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                txtPass.Clear();
+                txtPass.Focus();
             }
         }
 
-        // Drag Form Logic
+        private void BtnLogin_MouseEnter(object sender, EventArgs e)
+        {
+            btnLogin.BackColor = Color.FromArgb(0, 100, 180);
+        }
+
+        private void BtnLogin_MouseLeave(object sender, EventArgs e)
+        {
+            btnLogin.BackColor = Color.FromArgb(0, 120, 215);
+        }
+
+        private void LblRegister_Click(object sender, EventArgs e)
+        {
+            this.DialogResult = DialogResult.Retry;
+            this.Close();
+        }
+
+        private void LblRegister_MouseEnter(object sender, EventArgs e)
+        {
+            lblRegister.ForeColor = Color.FromArgb(100, 160, 220);
+        }
+
+        private void LblRegister_MouseLeave(object sender, EventArgs e)
+        {
+            lblRegister.ForeColor = Color.FromArgb(140, 140, 140);
+        }
+
+        private void LblForgotPassword_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("Tính năng đang được phát triển!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void LblForgotPassword_MouseEnter(object sender, EventArgs e)
+        {
+            lblForgotPassword.Font = new Font(lblForgotPassword.Font, FontStyle.Underline);
+        }
+
+        private void LblForgotPassword_MouseLeave(object sender, EventArgs e)
+        {
+            lblForgotPassword.Font = new Font(lblForgotPassword.Font, FontStyle.Regular);
+        }
+
+        #endregion
+
+        #region Form Paint - Border
+
+        private void LoginForm_Paint(object sender, PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            
+            // Vẽ border gradient
+            using (LinearGradientBrush brush = new LinearGradientBrush(
+                new Point(0, 0), 
+                new Point(this.Width, this.Height),
+                Color.FromArgb(0, 120, 215),
+                Color.FromArgb(100, 160, 220)))
+            using (Pen pen = new Pen(brush, 2))
+            {
+                e.Graphics.DrawRectangle(pen, 0, 0, this.Width - 1, this.Height - 1);
+            }
+        }
+
+        #endregion
+
+        #region Win32 API for Dragging
+
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         public static extern bool ReleaseCapture();
+
+        #endregion
     }
 }

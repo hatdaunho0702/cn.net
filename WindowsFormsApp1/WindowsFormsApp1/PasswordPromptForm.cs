@@ -3,121 +3,75 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using WindowsFormsApp1.Data;
+using WindowsFormsApp1.Utils;
 
 namespace WindowsFormsApp1.Forms
 {
-    // Thêm từ khóa 'partial' để tránh lỗi nếu bạn chưa kịp xóa file Designer
     public partial class PasswordPromptForm : Form
     {
         public bool IsVerified { get; private set; } = false;
-        private TextBox txtPass;
-        private Button btnOK, btnCancel;
 
         public PasswordPromptForm()
         {
-            // Cấu hình Form
-            this.Text = "Xác thực bảo mật";
-            this.Size = new Size(400, 220);
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.FormBorderStyle = FormBorderStyle.None; // Không viền hệ thống
-            this.BackColor = Color.FromArgb(45, 45, 48); // Màu nền xám đậm
-            this.ForeColor = Color.White;
+            InitializeComponent();
+            ApplyStyles();
+        }
+
+        private void ApplyStyles()
+        {
+            // Bo góc cho input container
+            UIHelper.RoundPanel(pnlPasswordContainer, 8);
+
+            // Bo góc cho buttons
+            UIHelper.RoundButton(btnOK, 8);
+            UIHelper.RoundButton(btnCancel, 8);
+
+            // Enable double buffering
             this.DoubleBuffered = true;
-
-            InitializeModernUI();
         }
 
-        private void InitializeModernUI()
+        #region Event Handlers - Header
+
+        private void PnlHeader_MouseDown(object sender, MouseEventArgs e)
         {
-            // 1. Title Bar (Thanh tiêu đề tự vẽ)
-            Panel pnlHeader = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Color.FromArgb(30, 30, 30) };
-            pnlHeader.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(Handle, 0xA1, 0x2, 0); } };
-
-            Label lblTitle = new Label
+            if (e.Button == MouseButtons.Left)
             {
-                Text = "🔒 Xác thực bảo mật",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.LightGray,
-                Location = new Point(15, 10),
-                AutoSize = true
-            };
-
-            Button btnClose = new Button { Text = "✕", Dock = DockStyle.Right, Width = 40, FlatStyle = FlatStyle.Flat, ForeColor = Color.Gray, Cursor = Cursors.Hand };
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.Click += (s, e) => this.Close();
-            btnClose.MouseEnter += (s, e) => { btnClose.BackColor = Color.Red; btnClose.ForeColor = Color.White; };
-            btnClose.MouseLeave += (s, e) => { btnClose.BackColor = Color.Transparent; btnClose.ForeColor = Color.Gray; };
-
-            pnlHeader.Controls.Add(lblTitle);
-            pnlHeader.Controls.Add(btnClose);
-
-            // 2. Nội dung chính
-            Label lblInstruction = new Label
-            {
-                Text = "Để bảo vệ tài khoản, vui lòng nhập mật khẩu hiện tại của bạn để tiếp tục.",
-                Font = new Font("Segoe UI", 10),
-                ForeColor = Color.Gainsboro,
-                Location = new Point(25, 60),
-                Size = new Size(350, 40)
-            };
-
-            // Panel chứa TextBox để tạo viền đẹp
-            Panel pnlTxtBg = new Panel { Location = new Point(25, 110), Size = new Size(350, 35), BackColor = Color.FromArgb(30, 30, 30) };
-            pnlTxtBg.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, pnlTxtBg.ClientRectangle, Color.FromArgb(100, 100, 100), ButtonBorderStyle.Solid);
-
-            txtPass = new TextBox
-            {
-                Location = new Point(10, 8), // Căn giữa panel
-                Width = 330,
-                BorderStyle = BorderStyle.None,
-                BackColor = Color.FromArgb(30, 30, 30),
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 11),
-                PasswordChar = '●',
-                UseSystemPasswordChar = true
-            };
-            pnlTxtBg.Controls.Add(txtPass);
-
-            // 3. Các nút bấm
-            btnOK = CreateModernButton("Xác Nhận", 180, 165, true);
-            btnOK.Click += BtnOK_Click;
-
-            btnCancel = CreateModernButton("Hủy Bỏ", 290, 165, false);
-            btnCancel.Click += (s, e) => this.Close();
-
-            // Thêm controls vào Form
-            this.Controls.Add(pnlHeader);
-            this.Controls.Add(lblInstruction);
-            this.Controls.Add(pnlTxtBg);
-            this.Controls.Add(btnOK);
-            this.Controls.Add(btnCancel);
-
-            this.AcceptButton = btnOK;
-            this.CancelButton = btnCancel;
-
-            // Vẽ viền ngoài cho Form
-            this.Paint += (s, e) => ControlPaint.DrawBorder(e.Graphics, this.ClientRectangle, Color.FromArgb(0, 122, 204), ButtonBorderStyle.Solid);
+                ReleaseCapture();
+                SendMessage(Handle, 0xA1, 0x2, 0);
+            }
         }
 
-        private Button CreateModernButton(string text, int x, int y, bool isPrimary)
+        private void BtnClose_Click(object sender, EventArgs e)
         {
-            Button btn = new Button
-            {
-                Text = text,
-                Location = new Point(x, y),
-                Size = new Size(95, 35),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                BackColor = isPrimary ? Color.FromArgb(0, 122, 204) : Color.FromArgb(60, 60, 60),
-                ForeColor = Color.White
-            };
-            btn.FlatAppearance.BorderSize = 0;
-            return btn;
+            this.Close();
         }
+
+        private void BtnClose_MouseEnter(object sender, EventArgs e)
+        {
+            btnClose.BackColor = Color.FromArgb(232, 17, 35);
+            btnClose.ForeColor = Color.White;
+        }
+
+        private void BtnClose_MouseLeave(object sender, EventArgs e)
+        {
+            btnClose.BackColor = Color.Transparent;
+            btnClose.ForeColor = Color.FromArgb(160, 160, 160);
+        }
+
+        #endregion
+
+        #region Event Handlers - Buttons
 
         private void BtnOK_Click(object sender, EventArgs e)
         {
+            if (string.IsNullOrWhiteSpace(txtPass.Text))
+            {
+                MessageBox.Show("Vui lòng nhập mật khẩu!", "Thông báo", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtPass.Focus();
+                return;
+            }
+
             int currentUid = DataManager.Instance.GetCurrentUser();
             if (DataManager.Instance.VerifyCurrentPassword(currentUid, txtPass.Text))
             {
@@ -127,14 +81,69 @@ namespace WindowsFormsApp1.Forms
             }
             else
             {
-                MessageBox.Show("Mật khẩu không đúng!", "Lỗi xác thực", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                txtPass.SelectAll();
+                MessageBox.Show("Mật khẩu không đúng!", "Lỗi xác thực", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                txtPass.Clear();
                 txtPass.Focus();
             }
         }
 
-        // Kéo thả Form không viền
-        [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
-        [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool ReleaseCapture();
+        private void BtnOK_MouseEnter(object sender, EventArgs e)
+        {
+            btnOK.BackColor = Color.FromArgb(0, 100, 180);
+        }
+
+        private void BtnOK_MouseLeave(object sender, EventArgs e)
+        {
+            btnOK.BackColor = Color.FromArgb(0, 120, 215);
+        }
+
+        private void BtnCancel_Click(object sender, EventArgs e)
+        {
+            this.DialogResult = DialogResult.Cancel;
+            this.Close();
+        }
+
+        private void BtnCancel_MouseEnter(object sender, EventArgs e)
+        {
+            btnCancel.BackColor = Color.FromArgb(80, 80, 85);
+        }
+
+        private void BtnCancel_MouseLeave(object sender, EventArgs e)
+        {
+            btnCancel.BackColor = Color.FromArgb(60, 60, 65);
+        }
+
+        #endregion
+
+        #region Form Paint - Border
+
+        private void PasswordPromptForm_Paint(object sender, PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            
+            // Vẽ border gradient
+            using (LinearGradientBrush brush = new LinearGradientBrush(
+                new Point(0, 0), 
+                new Point(this.Width, this.Height),
+                Color.FromArgb(0, 120, 215),
+                Color.FromArgb(100, 160, 220)))
+            using (Pen pen = new Pen(brush, 2))
+            {
+                e.Graphics.DrawRectangle(pen, 0, 0, this.Width - 1, this.Height - 1);
+            }
+        }
+
+        #endregion
+
+        #region Win32 API for Dragging
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern bool ReleaseCapture();
+
+        #endregion
     }
 }
