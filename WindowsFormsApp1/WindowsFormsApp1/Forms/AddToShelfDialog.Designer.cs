@@ -56,7 +56,7 @@
             this.pnlHeader.Controls.Add(this.lblIcon);
             this.pnlHeader.Dock = System.Windows.Forms.DockStyle.Top;
             this.pnlHeader.Location = new System.Drawing.Point(0, 0);
-            this.pnlHeader.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.pnlHeader.Margin = new System.Windows.Forms.Padding(4);
             this.pnlHeader.Name = "pnlHeader";
             this.pnlHeader.Size = new System.Drawing.Size(560, 62);
             this.pnlHeader.TabIndex = 0;
@@ -72,7 +72,7 @@
             this.btnClose.Font = new System.Drawing.Font("Segoe UI", 10F);
             this.btnClose.ForeColor = System.Drawing.Color.Gray;
             this.btnClose.Location = new System.Drawing.Point(507, 0);
-            this.btnClose.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btnClose.Margin = new System.Windows.Forms.Padding(4);
             this.btnClose.Name = "btnClose";
             this.btnClose.Size = new System.Drawing.Size(53, 62);
             this.btnClose.TabIndex = 2;
@@ -124,7 +124,7 @@
             this.pnlSelectContainer.Controls.Add(this.cmbShelves);
             this.pnlSelectContainer.Controls.Add(this.lblSelectIcon);
             this.pnlSelectContainer.Location = new System.Drawing.Point(27, 105);
-            this.pnlSelectContainer.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.pnlSelectContainer.Margin = new System.Windows.Forms.Padding(4);
             this.pnlSelectContainer.Name = "pnlSelectContainer";
             this.pnlSelectContainer.Size = new System.Drawing.Size(507, 49);
             this.pnlSelectContainer.TabIndex = 2;
@@ -139,7 +139,7 @@
             this.cmbShelves.ForeColor = System.Drawing.Color.White;
             this.cmbShelves.FormattingEnabled = true;
             this.cmbShelves.Location = new System.Drawing.Point(53, 0);
-            this.cmbShelves.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.cmbShelves.Margin = new System.Windows.Forms.Padding(4);
             this.cmbShelves.Name = "cmbShelves";
             this.cmbShelves.Size = new System.Drawing.Size(454, 33);
             this.cmbShelves.TabIndex = 1;
@@ -188,7 +188,7 @@
             this.pnlNewContainer.Controls.Add(this.txtNewShelf);
             this.pnlNewContainer.Controls.Add(this.lblNewIcon);
             this.pnlNewContainer.Location = new System.Drawing.Point(27, 228);
-            this.pnlNewContainer.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.pnlNewContainer.Margin = new System.Windows.Forms.Padding(4);
             this.pnlNewContainer.Name = "pnlNewContainer";
             this.pnlNewContainer.Size = new System.Drawing.Size(507, 49);
             this.pnlNewContainer.TabIndex = 5;
@@ -201,7 +201,7 @@
             this.txtNewShelf.Font = new System.Drawing.Font("Segoe UI", 12F);
             this.txtNewShelf.ForeColor = System.Drawing.Color.White;
             this.txtNewShelf.Location = new System.Drawing.Point(53, 0);
-            this.txtNewShelf.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.txtNewShelf.Margin = new System.Windows.Forms.Padding(4);
             this.txtNewShelf.Name = "txtNewShelf";
             this.txtNewShelf.Size = new System.Drawing.Size(454, 27);
             this.txtNewShelf.TabIndex = 1;
@@ -229,7 +229,7 @@
             this.btnConfirm.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
             this.btnConfirm.ForeColor = System.Drawing.Color.White;
             this.btnConfirm.Location = new System.Drawing.Point(293, 302);
-            this.btnConfirm.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btnConfirm.Margin = new System.Windows.Forms.Padding(4);
             this.btnConfirm.Name = "btnConfirm";
             this.btnConfirm.Size = new System.Drawing.Size(240, 52);
             this.btnConfirm.TabIndex = 6;
@@ -247,7 +247,7 @@
             this.btnCancel.Font = new System.Drawing.Font("Segoe UI", 10F);
             this.btnCancel.ForeColor = System.Drawing.Color.White;
             this.btnCancel.Location = new System.Drawing.Point(27, 302);
-            this.btnCancel.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btnCancel.Margin = new System.Windows.Forms.Padding(4);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(240, 52);
             this.btnCancel.TabIndex = 7;
@@ -273,7 +273,7 @@
             this.Controls.Add(this.pnlHeader);
             this.ForeColor = System.Drawing.Color.White;
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
-            this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "AddToShelfDialog";
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
