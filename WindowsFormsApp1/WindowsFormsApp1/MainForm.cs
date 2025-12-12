@@ -216,6 +216,7 @@ namespace WindowsFormsApp1
             // 5. User Profile
             SetupUserProfile();
 
+
             topBar.Controls.AddRange(new Control[] {
                 menuButton, logoLabel, searchPanel,
                 btnReport, sortButton, btnAddBook,
