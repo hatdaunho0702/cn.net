@@ -64,6 +64,19 @@ namespace WindowsFormsApp1.Forms
         private Button btnSendChat;
         private bool isChatOpen = false;
 
+        // ======================= [MỚI] HIGHLIGHTS PANEL & STRUCTURE TREEVIEW =======================
+        // Panel hiển thị danh sách highlights
+        private Panel pnlHighlights;
+        private FlowLayoutPanel highlightsList;
+        private Button btnToggleHighlights;
+        private bool isHighlightsPanelOpen = false;
+
+        // TreeView hiển thị cấu trúc chapters và highlights
+        private Panel pnlStructure;
+        private TreeView treeStructure;
+        private Button btnToggleStructure;
+        private bool isStructurePanelOpen = false;
+
         // Settings Data
         private float currentFontSize = 14f;
         private string currentFontFamily = "Segoe UI";
@@ -402,6 +415,21 @@ namespace WindowsFormsApp1.Forms
             InitializeWindowControls();
             topBar.Controls.Add(pnlWindowControls);
             var btnSettings = CreateIconButton("⚙", 45, (s, e) => ToggleSettings()); btnSettings.Dock = DockStyle.Right; topBar.Controls.Add(btnSettings);
+            
+            // [MỚI] Thêm nút toggle cho Highlights Panel
+            btnToggleHighlights = CreateIconButton("📋", 70, (s, e) => ToggleHighlightsPanel());
+            btnToggleHighlights.Text = "📋 Ghi chú";
+            btnToggleHighlights.Font = new Font("Segoe UI", 9, FontStyle.Regular);
+            btnToggleHighlights.Dock = DockStyle.Right;
+            topBar.Controls.Add(btnToggleHighlights);
+            
+            // [MỚI] Thêm nút toggle cho Structure TreeView
+            btnToggleStructure = CreateIconButton("📑", 80, (s, e) => ToggleStructurePanel());
+            btnToggleStructure.Text = "📑 Cấu trúc";
+            btnToggleStructure.Font = new Font("Segoe UI", 9, FontStyle.Regular);
+            btnToggleStructure.Dock = DockStyle.Right;
+            topBar.Controls.Add(btnToggleStructure);
+            
             var btnBack = CreateIconButton("🡠", 50, (s, e) => this.Close()); btnBack.Dock = DockStyle.Left; topBar.Controls.Add(btnBack);
             lblTitle = new Label { Text = _book.Title.ToUpper(), TextAlign = ContentAlignment.MiddleCenter, Dock = DockStyle.Fill, Font = new Font("Segoe UI", 11, FontStyle.Bold), AutoEllipsis = true, ForeColor = Color.FromArgb(64, 64, 64) };
             lblTitle.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(Handle, 0xA1, 0x2, 0); } };
@@ -427,8 +455,15 @@ namespace WindowsFormsApp1.Forms
             progressBar.Controls.Add(progressFill);
 
             InitializeSettingsPanel(); InitializeTOCPanel(); InitializeSideToggleButton();
+            
+            // [MỚI] Khởi tạo các panel mới
+            InitializeHighlightsPanel();
+            InitializeStructurePanel();
 
             this.Controls.Add(pnlSettings); this.Controls.Add(btnSideToggle); this.Controls.Add(pnlTOC);
+            // [MỚI] Thêm các panel mới vào form
+            this.Controls.Add(pnlHighlights);
+            this.Controls.Add(pnlStructure);
             mainContainer.Controls.Add(btnPrevFloat); mainContainer.Controls.Add(btnNextFloat);
             this.Controls.Add(mainContainer); this.Controls.Add(progressBar); this.Controls.Add(topBar);
 
@@ -492,6 +527,12 @@ namespace WindowsFormsApp1.Forms
             if (pnlTOC != null) { pnlTOC.BackColor = uiBg; lstChapters.BackColor = uiBg; lstChapters.ForeColor = fg; }
             foreach (Control c in topBar.Controls) if (c is Button b) b.ForeColor = fg;
             if (pnlSettings != null) { pnlSettings.BackColor = paperBg; foreach (Control c in pnlSettings.Controls[0].Controls) if (c is FlowLayoutPanel fp) foreach (Control b in fp.Controls) if (b is Button btn) { btn.BackColor = accent; btn.ForeColor = fg; } }
+            
+            // [MỚI] Apply theme cho Highlights Panel
+            if (pnlHighlights != null) { pnlHighlights.BackColor = uiBg; if (highlightsList != null) highlightsList.BackColor = paperBg; }
+            // [MỚI] Apply theme cho Structure Panel
+            if (pnlStructure != null) { pnlStructure.BackColor = uiBg; if (treeStructure != null) { treeStructure.BackColor = paperBg; treeStructure.ForeColor = fg; } }
+            
             UpdateThemeColors();
             if (_chapters != null && _chapters.Count > 0) DisplayFullChapter(_currentChapterIndex, contentBox.SelectionStart);
         }
@@ -527,6 +568,440 @@ namespace WindowsFormsApp1.Forms
             pnlSettings.Controls.Add(flow);
         }
 
+        // ======================= [MỚI] HIGHLIGHTS PANEL =======================
+        /// <summary>
+        /// Khởi tạo Panel hiển thị danh sách Highlights bên phải màn hình
+        /// </summary>
+        private void InitializeHighlightsPanel()
+        {
+            pnlHighlights = new Panel
+            {
+                Width = 320,
+                Dock = DockStyle.Right,
+                Visible = false,
+                BorderStyle = BorderStyle.FixedSingle,
+                Padding = new Padding(1)
+            };
+
+            // Header
+            var lblHeader = new Label
+            {
+                Text = "📋 DANH SÁCH GHI CHÚ",
+                Dock = DockStyle.Top,
+                Height = 50,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                ForeColor = Color.FromArgb(64, 64, 64),
+                BackColor = Color.Transparent
+            };
+
+            // Close button
+            var btnClose = new Button
+            {
+                Text = "✕",
+                Size = new Size(30, 30),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.Transparent,
+                ForeColor = Color.Gray,
+                Font = new Font("Arial", 10),
+                Cursor = Cursors.Hand,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnClose.FlatAppearance.BorderSize = 0;
+            btnClose.Click += (s, e) => ToggleHighlightsPanel();
+            btnClose.Location = new Point(pnlHighlights.Width - 35, 10);
+            lblHeader.Controls.Add(btnClose);
+
+            // FlowLayoutPanel để hiển thị danh sách highlights
+            highlightsList = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                Padding = new Padding(10),
+                BackColor = Color.White
+            };
+            highlightsList.HorizontalScroll.Maximum = 0;
+            highlightsList.AutoScroll = false;
+            highlightsList.VerticalScroll.Visible = false;
+            highlightsList.AutoScroll = true;
+
+            pnlHighlights.Controls.Add(highlightsList);
+            pnlHighlights.Controls.Add(lblHeader);
+        }
+
+        /// <summary>
+        /// Toggle hiển thị/ẩn Highlights Panel
+        /// </summary>
+        private void ToggleHighlightsPanel()
+        {
+            isHighlightsPanelOpen = !isHighlightsPanelOpen;
+            pnlHighlights.Visible = isHighlightsPanelOpen;
+
+            if (isHighlightsPanelOpen)
+            {
+                RefreshHighlightsPanel();
+                pnlHighlights.BringToFront();
+            }
+
+            UpdateHighlightsPanelPosition();
+        }
+
+        /// <summary>
+        /// Cập nhật vị trí của Highlights Panel
+        /// </summary>
+        private void UpdateHighlightsPanelPosition()
+        {
+            if (pnlHighlights != null)
+            {
+                pnlHighlights.Height = this.ClientSize.Height - topBar.Height - progressBar.Height;
+                pnlHighlights.Top = topBar.Height;
+            }
+        }
+
+        /// <summary>
+        /// Refresh danh sách highlights từ database
+        /// </summary>
+        private void RefreshHighlightsPanel()
+        {
+            if (highlightsList == null) return;
+            highlightsList.Controls.Clear();
+
+            var highlights = DataManager.Instance.GetHighlightsForBook(_book.Id);
+            if (highlights.Count == 0)
+            {
+                var lblEmpty = new Label
+                {
+                    Text = "Chưa có ghi chú nào.\nHãy bôi đen văn bản để tạo highlight!",
+                    AutoSize = true,
+                    ForeColor = Color.Gray,
+                    Font = new Font("Segoe UI", 10, FontStyle.Italic),
+                    Padding = new Padding(10)
+                };
+                highlightsList.Controls.Add(lblEmpty);
+                return;
+            }
+
+            foreach (var hl in highlights)
+            {
+                var card = CreateHighlightCard(hl);
+                highlightsList.Controls.Add(card);
+            }
+        }
+
+        /// <summary>
+        /// Tạo một card để hiển thị thông tin highlight
+        /// </summary>
+        private Panel CreateHighlightCard(Highlight hl)
+        {
+            Color hlColor;
+            try { hlColor = ColorTranslator.FromHtml(hl.ColorHex); }
+            catch { hlColor = Color.Yellow; }
+
+            var card = new Panel
+            {
+                Width = highlightsList.Width - 30,
+                AutoSize = true,
+                MinimumSize = new Size(280, 60),
+                Padding = new Padding(10),
+                Margin = new Padding(0, 0, 0, 10),
+                BackColor = Color.FromArgb(250, 250, 250),
+                Cursor = Cursors.Hand
+            };
+
+            // Color indicator bar
+            var colorBar = new Panel
+            {
+                Width = 5,
+                Dock = DockStyle.Left,
+                BackColor = hlColor
+            };
+
+            // Content panel
+            var contentPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(10, 0, 0, 0)
+            };
+
+            // Chapter info
+            string chapterTitle = "";
+            if (_chapters != null && hl.ChapterIndex >= 0 && hl.ChapterIndex < _chapters.Count)
+            {
+                chapterTitle = _chapters[hl.ChapterIndex].ChapterTitle;
+            }
+
+            var lblChapter = new Label
+            {
+                Text = $"Chương {hl.ChapterIndex + 1}: {chapterTitle}",
+                Font = new Font("Segoe UI", 8, FontStyle.Italic),
+                ForeColor = Color.Gray,
+                AutoSize = true,
+                MaximumSize = new Size(250, 0),
+                Dock = DockStyle.Top
+            };
+
+            // Highlight text
+            string displayText = hl.SelectedText.Length > 100 ? hl.SelectedText.Substring(0, 100) + "..." : hl.SelectedText;
+            var lblText = new Label
+            {
+                Text = $"\"{displayText}\"",
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(33, 33, 33),
+                AutoSize = true,
+                MaximumSize = new Size(250, 0),
+                Dock = DockStyle.Top,
+                Padding = new Padding(0, 5, 0, 5)
+            };
+
+            // Note (if exists)
+            if (!string.IsNullOrEmpty(hl.Note))
+            {
+                var lblNote = new Label
+                {
+                    Text = $"📝 {hl.Note}",
+                    Font = new Font("Segoe UI", 8),
+                    ForeColor = Color.FromArgb(100, 100, 100),
+                    AutoSize = true,
+                    MaximumSize = new Size(250, 0),
+                    Dock = DockStyle.Top
+                };
+                contentPanel.Controls.Add(lblNote);
+            }
+
+            contentPanel.Controls.Add(lblText);
+            contentPanel.Controls.Add(lblChapter);
+
+            card.Controls.Add(contentPanel);
+            card.Controls.Add(colorBar);
+
+            // Click event to navigate to highlight
+            int chapterIdx = hl.ChapterIndex;
+            int startIdx = hl.StartIndex;
+            card.Click += (s, e) => NavigateToHighlight(chapterIdx, startIdx);
+            foreach (Control c in contentPanel.Controls)
+            {
+                c.Click += (s, e) => NavigateToHighlight(chapterIdx, startIdx);
+            }
+
+            // Hover effect
+            card.MouseEnter += (s, e) => card.BackColor = Color.FromArgb(240, 240, 240);
+            card.MouseLeave += (s, e) => card.BackColor = Color.FromArgb(250, 250, 250);
+
+            return card;
+        }
+
+        /// <summary>
+        /// Navigate đến vị trí highlight trong sách
+        /// </summary>
+        private void NavigateToHighlight(int chapterIndex, int startIndex)
+        {
+            if (_chapters == null || chapterIndex < 0 || chapterIndex >= _chapters.Count) return;
+
+            if (_currentChapterIndex != chapterIndex)
+            {
+                SaveCurrentProgress();
+                _currentChapterIndex = chapterIndex;
+                DisplayFullChapter(_currentChapterIndex, startIndex);
+            }
+            else
+            {
+                // Scroll to position
+                if (startIndex >= 0 && startIndex < contentBox.TextLength)
+                {
+                    contentBox.SelectionStart = startIndex;
+                    contentBox.ScrollToCaret();
+                }
+            }
+
+            // Close panels after navigation
+            if (isHighlightsPanelOpen) ToggleHighlightsPanel();
+            if (isStructurePanelOpen) ToggleStructurePanel();
+        }
+
+        // ======================= [MỚI] STRUCTURE TREEVIEW PANEL =======================
+        /// <summary>
+        /// Khởi tạo Panel hiển thị TreeView cấu trúc chapters và highlights
+        /// </summary>
+        private void InitializeStructurePanel()
+        {
+            pnlStructure = new Panel
+            {
+                Width = 350,
+                Dock = DockStyle.Left,
+                Visible = false,
+                BorderStyle = BorderStyle.FixedSingle,
+                Padding = new Padding(1)
+            };
+
+            // Header
+            var lblHeader = new Label
+            {
+                Text = "📑 CẤU TRÚC SÁCH",
+                Dock = DockStyle.Top,
+                Height = 50,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                ForeColor = Color.FromArgb(64, 64, 64),
+                BackColor = Color.Transparent
+            };
+
+            // Close button
+            var btnClose = new Button
+            {
+                Text = "✕",
+                Size = new Size(30, 30),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.Transparent,
+                ForeColor = Color.Gray,
+                Font = new Font("Arial", 10),
+                Cursor = Cursors.Hand,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnClose.FlatAppearance.BorderSize = 0;
+            btnClose.Click += (s, e) => ToggleStructurePanel();
+            btnClose.Location = new Point(pnlStructure.Width - 35, 10);
+            lblHeader.Controls.Add(btnClose);
+
+            // TreeView for structure
+            treeStructure = new TreeView
+            {
+                Dock = DockStyle.Fill,
+                BorderStyle = BorderStyle.None,
+                Font = new Font("Segoe UI", 10),
+                ItemHeight = 30,
+                ShowLines = true,
+                ShowPlusMinus = true,
+                ShowRootLines = true,
+                FullRowSelect = true,
+                HideSelection = false
+            };
+            treeStructure.AfterSelect += TreeStructure_AfterSelect;
+
+            pnlStructure.Controls.Add(treeStructure);
+            pnlStructure.Controls.Add(lblHeader);
+        }
+
+        /// <summary>
+        /// Toggle hiển thị/ẩn Structure Panel
+        /// </summary>
+        private void ToggleStructurePanel()
+        {
+            isStructurePanelOpen = !isStructurePanelOpen;
+            pnlStructure.Visible = isStructurePanelOpen;
+
+            if (isStructurePanelOpen)
+            {
+                RefreshStructurePanel();
+                pnlStructure.BringToFront();
+            }
+
+            UpdateStructurePanelPosition();
+        }
+
+        /// <summary>
+        /// Cập nhật vị trí của Structure Panel
+        /// </summary>
+        private void UpdateStructurePanelPosition()
+        {
+            if (pnlStructure != null)
+            {
+                pnlStructure.Height = this.ClientSize.Height - topBar.Height - progressBar.Height;
+                pnlStructure.Top = topBar.Height;
+            }
+        }
+
+        /// <summary>
+        /// Refresh TreeView cấu trúc chapters và highlights
+        /// </summary>
+        private void RefreshStructurePanel()
+        {
+            if (treeStructure == null || _chapters == null) return;
+            treeStructure.Nodes.Clear();
+
+            var highlights = DataManager.Instance.GetHighlightsForBook(_book.Id);
+
+            for (int i = 0; i < _chapters.Count; i++)
+            {
+                var chapter = _chapters[i];
+                var chapterNode = new TreeNode($"📖 Chương {i + 1}: {chapter.ChapterTitle}")
+                {
+                    Tag = new NodeData { Type = "chapter", ChapterIndex = i, StartIndex = 0 }
+                };
+
+                // Add highlights as child nodes
+                var chapterHighlights = highlights.FindAll(h => h.ChapterIndex == i);
+                foreach (var hl in chapterHighlights)
+                {
+                    string hlText = hl.SelectedText.Length > 40 ? hl.SelectedText.Substring(0, 40) + "..." : hl.SelectedText;
+                    Color hlColor;
+                    try { hlColor = ColorTranslator.FromHtml(hl.ColorHex); }
+                    catch { hlColor = Color.Yellow; }
+
+                    string colorIcon = GetColorEmoji(hlColor);
+                    var highlightNode = new TreeNode($"{colorIcon} {hlText}")
+                    {
+                        Tag = new NodeData { Type = "highlight", ChapterIndex = hl.ChapterIndex, StartIndex = hl.StartIndex },
+                        ForeColor = hlColor.GetBrightness() < 0.5 ? hlColor : Color.FromArgb(
+                            Math.Max(0, hlColor.R - 50),
+                            Math.Max(0, hlColor.G - 50),
+                            Math.Max(0, hlColor.B - 50))
+                    };
+                    chapterNode.Nodes.Add(highlightNode);
+                }
+
+                // Highlight current chapter
+                if (i == _currentChapterIndex)
+                {
+                    chapterNode.NodeFont = new Font(treeStructure.Font, FontStyle.Bold);
+                    chapterNode.ForeColor = Color.FromArgb(255, 110, 64);
+                }
+
+                treeStructure.Nodes.Add(chapterNode);
+            }
+
+            // Expand current chapter node
+            if (_currentChapterIndex >= 0 && _currentChapterIndex < treeStructure.Nodes.Count)
+            {
+                treeStructure.Nodes[_currentChapterIndex].Expand();
+                treeStructure.SelectedNode = treeStructure.Nodes[_currentChapterIndex];
+            }
+        }
+
+        /// <summary>
+        /// Helper để lấy emoji tương ứng với màu highlight
+        /// </summary>
+        private string GetColorEmoji(Color color)
+        {
+            if (color.R > 200 && color.G > 200 && color.B < 100) return "🟡"; // Yellow
+            if (color.G > 200 && color.R < 200) return "🟢"; // Green
+            if (color.R > 200 && color.G < 150) return "🔴"; // Pink/Red
+            if (color.B > 180 && color.R > 180) return "🟣"; // Purple
+            return "⚪"; // Default
+        }
+
+        /// <summary>
+        /// Handler khi chọn node trong TreeView
+        /// </summary>
+        private void TreeStructure_AfterSelect(object sender, TreeViewEventArgs e)
+        {
+            if (e.Node?.Tag is NodeData nodeData)
+            {
+                NavigateToHighlight(nodeData.ChapterIndex, nodeData.StartIndex);
+            }
+        }
+
+        /// <summary>
+        /// Class để lưu trữ dữ liệu node
+        /// </summary>
+        private class NodeData
+        {
+            public string Type { get; set; } // "chapter" or "highlight"
+            public int ChapterIndex { get; set; }
+            public int StartIndex { get; set; }
+        }
+
         private Button CreateIconButton(string text, int width, EventHandler onClick) { var btn = new Button { Text = text, Width = width, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI Symbol", 14, FontStyle.Regular), Cursor = Cursors.Hand, Dock = DockStyle.Left, BackColor = Color.Transparent }; btn.FlatAppearance.BorderSize = 0; btn.Click += onClick; return btn; }
         private Button CreateSmallButton(string text, EventHandler onClick) { var btn = new Button { Text = text, Size = new Size(70, 35), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand, Margin = new Padding(0, 0, 5, 0), Font = new Font("Segoe UI", 9) }; btn.Click += onClick; return btn; }
         private void LstChapters_DrawItem(object sender, DrawItemEventArgs e) { if (e.Index < 0) return; e.DrawBackground(); bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected; if (isSelected) using (Brush b = new SolidBrush(Color.FromArgb(20, 0, 0, 0))) e.Graphics.FillRectangle(b, e.Bounds); Color textColor = isSelected ? Color.FromArgb(255, 110, 64) : (currentTheme == Theme.Dark ? Color.White : Color.Black); TextRenderer.DrawText(e.Graphics, lstChapters.Items[e.Index].ToString(), e.Font, e.Bounds, textColor, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.LeftAndRightPadding); }
@@ -544,17 +1019,23 @@ namespace WindowsFormsApp1.Forms
         private void UpdateChatUIPosition() { if (btnGeminiFloat == null) return; int margin = 25; btnGeminiFloat.Location = new Point(this.ClientSize.Width - btnGeminiFloat.Width - margin, this.ClientSize.Height - btnGeminiFloat.Height - margin - 20); pnlChatBox.Location = new Point(this.ClientSize.Width - pnlChatBox.Width - margin, btnGeminiFloat.Top - pnlChatBox.Height - 15); btnGeminiFloat.BringToFront(); pnlChatBox.BringToFront(); }
         private void ToggleChatWindow() { isChatOpen = !isChatOpen; pnlChatBox.Visible = isChatOpen; if (isChatOpen) txtChatInput.Focus(); }
 
+        // [MỚI] Helper để refresh highlights panel nếu đang mở
+        private void RefreshHighlightsIfVisible() { if (isHighlightsPanelOpen && pnlHighlights != null) RefreshHighlightsPanel(); }
+        
+        // [MỚI] Helper để refresh structure panel nếu đang mở
+        private void RefreshStructureIfVisible() { if (isStructurePanelOpen && pnlStructure != null) RefreshStructurePanel(); }
+
         private void InitializeFloatingMenu() { _floatingMenu = new ContextMenuStrip(); _floatingMenu.Renderer = new ToolStripProfessionalRenderer(new ModernColorTable()); var colors = new[] { (Name: "Vàng", Color: Color.FromArgb(255, 235, 59)), (Name: "Xanh lá", Color: Color.FromArgb(178, 255, 89)), (Name: "Hồng", Color: Color.FromArgb(255, 128, 171)), (Name: "Tím", Color: Color.FromArgb(209, 196, 233)) }; foreach (var c in colors) { var item = new ToolStripMenuItem(c.Name); Bitmap bmp = new Bitmap(16, 16); using (Graphics g = Graphics.FromImage(bmp)) { g.Clear(c.Color); g.DrawRectangle(Pens.Gray, 0, 0, 15, 15); } item.Image = bmp; item.Click += (s, e) => CreateHighlight(c.Color); _floatingMenu.Items.Add(item); } _floatingMenu.Items.Add(new ToolStripSeparator()); var btnNote = new ToolStripMenuItem("📝 Thêm Ghi Chú"); btnNote.Click += (s, e) => HandleNoteInput(); _floatingMenu.Items.Add(btnNote); _floatingMenu.Items.Add(new ToolStripSeparator()); var btnExportNotes = new ToolStripMenuItem("🖨 Xuất tất cả ghi chú"); btnExportNotes.Click += (s, e) => ExportBookNotes(); _floatingMenu.Items.Add(btnExportNotes); }
         private void ExportBookNotes() { var highlights = DataManager.Instance.GetHighlightsForBook(_book.Id); if (highlights.Count == 0) { MessageBox.Show("Cuốn sách này chưa có ghi chú nào!", "Thông báo"); return; } var reportService = new WindowsFormsApp1.Services.ReportService(); reportService.CreateNotesReport(_book, highlights); }
         private void ContentBox_MouseUp(object sender, MouseEventArgs e) { if (e.Button == MouseButtons.Left && contentBox.SelectionLength > 0) _floatingMenu.Show(Cursor.Position); else { if (pnlSettings.Visible && !pnlSettings.Bounds.Contains(PointToClient(Cursor.Position))) pnlSettings.Visible = false; } }
-        private void CreateHighlight(Color color, string noteContent = "") { if (contentBox.SelectionLength == 0) return; try { var hl = new Highlight { BookId = _book.Id, UserId = DataManager.Instance.GetCurrentUser(), ChapterIndex = _currentChapterIndex, StartIndex = contentBox.SelectionStart, Length = contentBox.SelectionLength, SelectedText = contentBox.SelectedText, Note = noteContent, ColorHex = ColorTranslator.ToHtml(color) }; DataManager.Instance.AddHighlight(hl); contentBox.SelectionBackColor = color; contentBox.SelectionLength = 0; } catch (Exception ex) { MessageBox.Show("Lỗi: " + ex.Message); } }
+        private void CreateHighlight(Color color, string noteContent = "") { if (contentBox.SelectionLength == 0) return; try { var hl = new Highlight { BookId = _book.Id, UserId = DataManager.Instance.GetCurrentUser(), ChapterIndex = _currentChapterIndex, StartIndex = contentBox.SelectionStart, Length = contentBox.SelectionLength, SelectedText = contentBox.SelectedText, Note = noteContent, ColorHex = ColorTranslator.ToHtml(color) }; DataManager.Instance.AddHighlight(hl); contentBox.SelectionBackColor = color; contentBox.SelectionLength = 0; RefreshHighlightsIfVisible(); RefreshStructureIfVisible(); } catch (Exception ex) { MessageBox.Show("Lỗi: " + ex.Message); } }
         private void HandleNoteInput() { if (contentBox.SelectionLength == 0) return; using (var dlg = new NoteDialog()) { if (dlg.ShowDialog() == DialogResult.OK) CreateHighlight(Color.Orange, dlg.NoteText); } }
         private void BookReaderForm_Load(object sender, EventArgs e) { BookReaderForm_Resize(this, null); LoadBookDataInitial(); UpdateSideTogglePosition(); UpdateChatUIPosition(); LoadSavedTheme(); }
-        private void BookReaderForm_Resize(object sender, EventArgs e) { if (mainContainer == null || pagePanel == null) return; int maxWidth = 900; int w = Math.Min(maxWidth, mainContainer.Width - 60); pagePanel.Size = new Size(w, mainContainer.Height - 30); pagePanel.Location = new Point((mainContainer.Width - w) / 2, 15); pagePanel.Invalidate(); if (pnlTOC != null) pnlTOC.Height = this.Height - topBar.Height; UpdateSideTogglePosition(); UpdateFloatingButtonsPosition(); UpdateProgressBar(); UpdatePageScrollbar(); UpdateChatUIPosition(); }
+        private void BookReaderForm_Resize(object sender, EventArgs e) { if (mainContainer == null || pagePanel == null) return; int maxWidth = 900; int w = Math.Min(maxWidth, mainContainer.Width - 60); pagePanel.Size = new Size(w, mainContainer.Height - 30); pagePanel.Location = new Point((mainContainer.Width - w) / 2, 15); pagePanel.Invalidate(); if (pnlTOC != null) pnlTOC.Height = this.Height - topBar.Height; UpdateSideTogglePosition(); UpdateFloatingButtonsPosition(); UpdateProgressBar(); UpdatePageScrollbar(); UpdateChatUIPosition(); UpdateHighlightsPanelPosition(); UpdateStructurePanelPosition(); }
         private void LoadBookDataInitial() { BackgroundWorker worker = new BackgroundWorker(); worker.DoWork += (s, args) => { try { _chapters = _readerService.ReadBookContent(_book) ?? new List<BookChapter>(); } catch { _chapters = new List<BookChapter>(); } }; worker.RunWorkerCompleted += (s, args) => { if (_chapters.Count == 0) _chapters.Add(new BookChapter { ChapterTitle = "Lỗi", Content = "Không thể tải nội dung." }); lstChapters.Items.Clear(); foreach (var c in _chapters) lstChapters.Items.Add(c.ChapterTitle); if (_targetChapter.HasValue && _targetPosition.HasValue) { _currentChapterIndex = Math.Min(Math.Max(0, _targetChapter.Value), _chapters.Count - 1); DisplayFullChapter(_currentChapterIndex, _targetPosition.Value); } else { var pos = _readerService.GetReadingPosition(_book.Id, DataManager.Instance.GetCurrentUser()); _currentChapterIndex = Math.Min(Math.Max(0, pos.chapter), _chapters.Count - 1); DisplayFullChapter(_currentChapterIndex, pos.position); } }; worker.RunWorkerAsync(); }
         private void UpdateProgressBar() { if (_chapters == null || _chapters.Count == 0 || progressFill == null) return; double progress = (double)(_currentChapterIndex + 1) / _chapters.Count; progressFill.Width = (int)(progressBar.Width * progress); }
         private void ReloadHighlights(int chapterIndex) { var highlights = DataManager.Instance.GetHighlightsForBook(_book.Id); int originalStart = contentBox.SelectionStart; foreach (var hl in highlights) { if (hl.ChapterIndex == chapterIndex) { if (hl.StartIndex >= 0 && (hl.StartIndex + hl.Length) <= contentBox.TextLength) { contentBox.Select(hl.StartIndex, hl.Length); try { contentBox.SelectionBackColor = ColorTranslator.FromHtml(hl.ColorHex); } catch { contentBox.SelectionBackColor = Color.Yellow; } } } } contentBox.Select(originalStart, 0); }
-        private void NavigateChapter(int step) { int newIndex = _currentChapterIndex + step; if (_chapters != null && newIndex >= 0 && newIndex < _chapters.Count) { SaveCurrentProgress(); _currentChapterIndex = newIndex; DisplayFullChapter(_currentChapterIndex); } }
+        private void NavigateChapter(int step) { int newIndex = _currentChapterIndex + step; if (_chapters != null && newIndex >= 0 && newIndex < _chapters.Count) { SaveCurrentProgress(); _currentChapterIndex = newIndex; DisplayFullChapter(_currentChapterIndex); RefreshStructureIfVisible(); } }
         private void SaveCurrentProgress() { if (_chapters == null || _chapters.Count == 0) return; int currentPos = contentBox.GetCharIndexFromPosition(new Point(10, 10)); _readerService.SaveReadingPosition(_book.Id, DataManager.Instance.GetCurrentUser(), _currentChapterIndex, currentPos); }
         private void BookReaderForm_FormClosing(object sender, FormClosingEventArgs e) 
         { 
